@@ -1,15 +1,20 @@
 openapi: 3.1.0
 info:
-  # Do not change the title, if the title changes, the import paths will be broken
   title: Api
   version: 0.1.0
-  description: API specification
+  description: Instagram Merchant Store API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
+  - name: store
+    description: Store operations
+  - name: products
+    description: Product operations
+  - name: categories
+    description: Category operations
 paths:
   /healthz:
     get:
@@ -24,6 +29,103 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
+
+  /store:
+    get:
+      operationId: getStore
+      tags: [store]
+      summary: Get store profile
+      description: Returns the merchant store profile info
+      responses:
+        "200":
+          description: Store profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/StoreProfile"
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List all products
+      description: Returns all products
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: featured
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        "200":
+          description: Product list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+
+  /products/{id}:
+    get:
+      operationId: getProduct
+      tags: [products]
+      summary: Get single product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Product details
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /categories:
+    get:
+      operationId: listCategories
+      tags: [categories]
+      summary: List all categories
+      responses:
+        "200":
+          description: Category list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Category"
+
+  /highlights:
+    get:
+      operationId: listHighlights
+      tags: [store]
+      summary: List story highlights
+      responses:
+        "200":
+          description: Highlights list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Highlight"
+
 components:
   schemas:
     HealthStatus:
@@ -34,3 +136,148 @@ components:
       required:
         - status
 
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: string
+      required:
+        - error
+
+    StoreProfile:
+      type: object
+      properties:
+        id:
+          type: integer
+        username:
+          type: string
+        displayName:
+          type: string
+        bio:
+          type: string
+        avatar:
+          type: string
+        coverImage:
+          type: string
+        followerCount:
+          type: integer
+        followingCount:
+          type: integer
+        postCount:
+          type: integer
+        isVerified:
+          type: boolean
+        website:
+          type: string
+        category:
+          type: string
+        location:
+          type: string
+      required:
+        - id
+        - username
+        - displayName
+        - bio
+        - avatar
+        - followerCount
+        - followingCount
+        - postCount
+        - isVerified
+
+    Product:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        originalPrice:
+          type: number
+        currency:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        likes:
+          type: integer
+        comments:
+          type: integer
+        isLiked:
+          type: boolean
+        isFeatured:
+          type: boolean
+        isSoldOut:
+          type: boolean
+        badge:
+          type: string
+        postedAt:
+          type: string
+        sellerUsername:
+          type: string
+        sellerAvatar:
+          type: string
+      required:
+        - id
+        - title
+        - description
+        - price
+        - currency
+        - images
+        - category
+        - tags
+        - likes
+        - comments
+        - isLiked
+        - isFeatured
+        - isSoldOut
+        - postedAt
+        - sellerUsername
+        - sellerAvatar
+
+    Category:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        slug:
+          type: string
+        emoji:
+          type: string
+        productCount:
+          type: integer
+      required:
+        - id
+        - name
+        - slug
+        - emoji
+        - productCount
+
+    Highlight:
+      type: object
+      properties:
+        id:
+          type: integer
+        title:
+          type: string
+        coverImage:
+          type: string
+        category:
+          type: string
+      required:
+        - id
+        - title
+        - coverImage
+        - category

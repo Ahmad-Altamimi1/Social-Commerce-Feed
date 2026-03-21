@@ -1,0 +1,17 @@
+packages:
+  "framer-motion": "For smooth social-media style animations, heart pops, and page transitions"
+  "date-fns": "For formatting post dates in a human-readable 'time ago' format"
+  "clsx": "Utility for constructing className strings conditionally"
+  "tailwind-merge": "Utility for merging tailwind classes safely"
+
+images:
+  - path: "artifacts/insta-store/public/images/default-avatar.png"
+    description: "A trendy, minimal line-art avatar of a stylized fashion or lifestyle store logo, monochromatic, clean background"
+    aspect_ratio: "1:1"
+  - path: "artifacts/insta-store/public/images/default-cover.png"
+    description: "A soft, aesthetic gradient blur background in pastel peach and warm gray tones, minimal texture"
+    aspect_ratio: "16:9"
+
+notes:
+  - "The API provides GET endpoints. For actions like 'Like', 'Save', or 'Add to Cart', we will use optimistic local state toggles since mutation endpoints are not yet defined in the OpenAPI spec."
+  - "The app uses a mobile-first, constrained-width container on desktop to mimic a native social media application experience."

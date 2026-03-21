@@ -1,0 +1,31 @@
+kind = "web"
+previewPath = "/"
+title = "Instagram Merchant Store"
+version = "1.0.0"
+id = "artifacts/insta-store"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 23910
+
+[services.development]
+run = "pnpm --filter @workspace/insta-store run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/insta-store", "run", "build" ]
+publicDir = "artifacts/insta-store/dist/public"
+serve = "static"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "23910"
+BASE_PATH = "/"
