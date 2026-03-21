@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { storeProfilesTable, productsTable, categoriesTable, highlightsTable } from "@workspace/db";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -17,26 +17,33 @@ router.get("/store", async (req, res) => {
     username: p.username,
     displayName: p.displayName,
     bio: p.bio,
+    tagline: p.tagline,
     avatar: p.avatar,
     coverImage: p.coverImage,
-    followerCount: p.followerCount,
-    followingCount: p.followingCount,
-    postCount: p.postCount,
+    totalFollowers: p.totalFollowers,
+    totalSales: p.totalSales,
+    rating: p.rating,
+    reviewCount: p.reviewCount,
     isVerified: p.isVerified,
     website: p.website,
     category: p.category,
     location: p.location,
+    socialLinks: p.socialLinks,
+    memberSince: p.memberSince,
   });
 });
 
 router.get("/products", async (req, res) => {
-  const { category, featured } = req.query as { category?: string; featured?: string };
+  const { category, featured, platform } = req.query as { category?: string; featured?: string; platform?: string };
   let rows = await db.select().from(productsTable);
-  if (category) {
+  if (category && category !== "all") {
     rows = rows.filter((r) => r.category === category);
   }
   if (featured === "true") {
     rows = rows.filter((r) => r.isFeatured);
+  }
+  if (platform) {
+    rows = rows.filter((r) => r.platform === platform);
   }
   res.json(
     rows.map((r) => ({
@@ -51,10 +58,12 @@ router.get("/products", async (req, res) => {
       tags: r.tags,
       likes: r.likes,
       comments: r.comments,
+      shares: r.shares,
       isLiked: false,
       isFeatured: r.isFeatured,
       isSoldOut: r.isSoldOut,
       badge: r.badge,
+      platform: r.platform,
       postedAt: r.postedAt.toISOString(),
       sellerUsername: r.sellerUsername,
       sellerAvatar: r.sellerAvatar,
@@ -86,10 +95,12 @@ router.get("/products/:id", async (req, res) => {
     tags: r.tags,
     likes: r.likes,
     comments: r.comments,
+    shares: r.shares,
     isLiked: false,
     isFeatured: r.isFeatured,
     isSoldOut: r.isSoldOut,
     badge: r.badge,
+    platform: r.platform,
     postedAt: r.postedAt.toISOString(),
     sellerUsername: r.sellerUsername,
     sellerAvatar: r.sellerAvatar,
@@ -117,6 +128,7 @@ router.get("/highlights", async (_req, res) => {
       title: r.title,
       coverImage: r.coverImage,
       category: r.category,
+      productCount: r.productCount,
     }))
   );
 });

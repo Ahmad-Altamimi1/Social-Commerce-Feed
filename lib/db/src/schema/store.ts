@@ -1,21 +1,32 @@
-import { pgTable, text, serial, integer, boolean, real, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, text, serial, integer, boolean, real, timestamp, jsonb } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod/v4";
+
+export type SocialLink = {
+  platform: string;
+  url: string;
+  handle: string;
+  followerCount?: number;
+};
 
 export const storeProfilesTable = pgTable("store_profiles", {
   id: serial("id").primaryKey(),
   username: text("username").notNull().unique(),
   displayName: text("display_name").notNull(),
   bio: text("bio").notNull().default(""),
+  tagline: text("tagline"),
   avatar: text("avatar").notNull(),
   coverImage: text("cover_image"),
-  followerCount: integer("follower_count").notNull().default(0),
-  followingCount: integer("following_count").notNull().default(0),
-  postCount: integer("post_count").notNull().default(0),
+  totalFollowers: integer("total_followers").notNull().default(0),
+  totalSales: integer("total_sales").notNull().default(0),
+  rating: real("rating").notNull().default(0),
+  reviewCount: integer("review_count").notNull().default(0),
   isVerified: boolean("is_verified").notNull().default(false),
   website: text("website"),
   category: text("category"),
   location: text("location"),
+  socialLinks: jsonb("social_links").$type<SocialLink[]>().notNull().default([]),
+  memberSince: text("member_since"),
 });
 
 export const categoriesTable = pgTable("categories", {
@@ -38,9 +49,11 @@ export const productsTable = pgTable("products", {
   tags: text("tags").array().notNull(),
   likes: integer("likes").notNull().default(0),
   comments: integer("comments").notNull().default(0),
+  shares: integer("shares").notNull().default(0),
   isFeatured: boolean("is_featured").notNull().default(false),
   isSoldOut: boolean("is_sold_out").notNull().default(false),
   badge: text("badge"),
+  platform: text("platform").notNull().default("instagram"),
   postedAt: timestamp("posted_at").notNull().defaultNow(),
   sellerUsername: text("seller_username").notNull(),
   sellerAvatar: text("seller_avatar").notNull(),
@@ -51,6 +64,7 @@ export const highlightsTable = pgTable("highlights", {
   title: text("title").notNull(),
   coverImage: text("cover_image").notNull(),
   category: text("category").notNull(),
+  productCount: integer("product_count").notNull().default(0),
 });
 
 export const insertStoreProfileSchema = createInsertSchema(storeProfilesTable).omit({ id: true });

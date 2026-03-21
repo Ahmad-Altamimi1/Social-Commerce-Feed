@@ -13,8 +13,8 @@ export function BottomNav() {
   ];
 
   return (
-    <div className="absolute bottom-0 left-0 right-0 bg-background/80 backdrop-blur-md border-t border-border z-50">
-      <div className="flex items-center justify-around h-14 px-4 pb-safe">
+    <div className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-xl border-t border-border z-50 shadow-[0_-4px_20px_-10px_rgba(0,0,0,0.1)]">
+      <div className="flex items-center justify-around h-[68px] px-2 pb-safe max-w-md mx-auto">
         {navItems.map((item) => {
           const isActive = location === item.path;
           const Icon = item.icon;
@@ -23,18 +23,26 @@ export function BottomNav() {
             <Link 
               key={item.path} 
               href={item.path}
-              className={cn(
-                "flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200",
-                isActive ? "text-foreground" : "text-muted-foreground hover:text-foreground"
-              )}
+              className="flex-1 flex justify-center items-center h-full"
             >
-              <Icon 
-                className={cn(
-                  "h-6 w-6 transition-all duration-300", 
-                  isActive && "fill-foreground scale-110"
-                )} 
-                strokeWidth={isActive ? 2 : 1.5} 
-              />
+              <div className={cn(
+                "flex flex-col items-center justify-center w-[60px] h-[52px] rounded-2xl transition-all duration-300",
+                isActive ? "bg-primary/10" : "hover:bg-muted/50"
+              )}>
+                <Icon 
+                  className={cn(
+                    "h-[22px] w-[22px] mb-1 transition-all duration-300", 
+                    isActive ? "text-primary fill-primary/20 scale-110" : "text-muted-foreground"
+                  )} 
+                  strokeWidth={isActive ? 2.5 : 2} 
+                />
+                <span className={cn(
+                  "text-[10px] font-semibold transition-colors duration-300",
+                  isActive ? "text-primary" : "text-muted-foreground"
+                )}>
+                  {item.label}
+                </span>
+              </div>
             </Link>
           );
         })}

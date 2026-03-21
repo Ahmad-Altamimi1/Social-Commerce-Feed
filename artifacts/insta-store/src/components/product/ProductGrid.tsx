@@ -19,33 +19,68 @@ export function ProductGrid({ products, onProductClick }: ProductGridProps) {
   }
 
   return (
-    <div className="grid grid-cols-3 gap-0.5 mt-0.5">
-      {products.map((product) => (
-        <button
-          key={product.id}
-          onClick={() => onProductClick(product.id)}
-          className="relative aspect-square bg-muted overflow-hidden group cursor-pointer"
-        >
-          <img 
-            src={product.images[0]} 
-            alt={product.title}
-            className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
-            loading="lazy"
-          />
-          {product.images.length > 1 && (
-            <div className="absolute top-2 right-2 drop-shadow-md">
-              <Square className="w-4 h-4 text-white fill-white/20" strokeWidth={2.5} />
+    <div className="grid grid-cols-2 gap-2 p-2 bg-background pb-20">
+      {products.map((product) => {
+        // Mock platform badge data
+        const platform = (product as any).platform || ["instagram", "facebook", "tiktok"][Math.floor(Math.random() * 3)];
+        
+        let platformColor = "bg-zinc-800 text-white";
+        let platformLabel = "TK";
+        if (platform === "instagram") {
+          platformColor = "bg-[#E1306C] text-white";
+          platformLabel = "IG";
+        } else if (platform === "facebook") {
+          platformColor = "bg-[#1877F2] text-white";
+          platformLabel = "FB";
+        } else if (platform === "tiktok") {
+          platformColor = "bg-[#000000] text-white";
+          platformLabel = "TT";
+        }
+
+        return (
+          <button
+            key={product.id}
+            onClick={() => onProductClick(product.id)}
+            className="relative aspect-[3/4] bg-muted overflow-hidden rounded-xl shadow-sm group cursor-pointer border border-border"
+          >
+            <img 
+              src={product.images[0]} 
+              alt={product.title}
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              loading="lazy"
+            />
+            
+            {/* Top Info */}
+            <div className="absolute top-2 left-2 right-2 flex justify-between items-start">
+              <div className="flex flex-col gap-1">
+                {product.isSoldOut && (
+                  <span className="bg-black/80 text-white text-[9px] font-bold tracking-widest uppercase px-1.5 py-0.5 rounded shadow-sm backdrop-blur-md">
+                    Sold
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col gap-1 items-end">
+                <div className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm backdrop-blur-md", platformColor)}>
+                  {platformLabel}
+                </div>
+                {product.images.length > 1 && (
+                  <div className="bg-black/50 rounded-md p-1 backdrop-blur-sm">
+                    <Square className="w-3 h-3 text-white fill-white/20" strokeWidth={2.5} />
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-          {product.isSoldOut && (
-            <div className="absolute inset-0 bg-black/40 flex items-center justify-center backdrop-blur-[1px]">
-              <span className="text-white text-[10px] font-bold tracking-widest uppercase bg-black/60 px-2 py-1 rounded">
-                Sold Out
+
+            {/* Bottom Gradient Overlay */}
+            <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent p-3 pt-8 flex flex-col items-start text-left">
+              <h4 className="text-white font-semibold text-sm line-clamp-1 w-full">{product.title}</h4>
+              <span className="text-white font-bold mt-0.5">
+                {product.currency === 'USD' ? '$' : product.currency}{product.price.toFixed(2)}
               </span>
             </div>
-          )}
-        </button>
-      ))}
+          </button>
+        );
+      })}
     </div>
   );
 }

@@ -2,7 +2,7 @@ openapi: 3.1.0
 info:
   title: Api
   version: 0.1.0
-  description: Instagram Merchant Store API
+  description: Social Commerce Store API
 servers:
   - url: /api
     description: Base API path
@@ -21,7 +21,6 @@ paths:
       operationId: healthCheck
       tags: [health]
       summary: Health check
-      description: Returns server health status
       responses:
         "200":
           description: Healthy
@@ -35,7 +34,6 @@ paths:
       operationId: getStore
       tags: [store]
       summary: Get store profile
-      description: Returns the merchant store profile info
       responses:
         "200":
           description: Store profile
@@ -49,7 +47,6 @@ paths:
       operationId: listProducts
       tags: [products]
       summary: List all products
-      description: Returns all products
       parameters:
         - name: category
           in: query
@@ -61,6 +58,11 @@ paths:
           required: false
           schema:
             type: boolean
+        - name: platform
+          in: query
+          required: false
+          schema:
+            type: string
       responses:
         "200":
           description: Product list
@@ -115,10 +117,10 @@ paths:
     get:
       operationId: listHighlights
       tags: [store]
-      summary: List story highlights
+      summary: List collections (formerly highlights)
       responses:
         "200":
-          description: Highlights list
+          description: Collections list
           content:
             application/json:
               schema:
@@ -144,6 +146,23 @@ components:
       required:
         - error
 
+    SocialLink:
+      type: object
+      properties:
+        platform:
+          type: string
+          description: "Platform name: instagram, facebook, tiktok, twitter, youtube"
+        url:
+          type: string
+        handle:
+          type: string
+        followerCount:
+          type: integer
+      required:
+        - platform
+        - url
+        - handle
+
     StoreProfile:
       type: object
       properties:
@@ -155,15 +174,19 @@ components:
           type: string
         bio:
           type: string
+        tagline:
+          type: string
         avatar:
           type: string
         coverImage:
           type: string
-        followerCount:
+        totalFollowers:
           type: integer
-        followingCount:
+        totalSales:
           type: integer
-        postCount:
+        rating:
+          type: number
+        reviewCount:
           type: integer
         isVerified:
           type: boolean
@@ -173,16 +196,22 @@ components:
           type: string
         location:
           type: string
+        socialLinks:
+          type: array
+          items:
+            $ref: "#/components/schemas/SocialLink"
+        memberSince:
+          type: string
       required:
         - id
         - username
         - displayName
         - bio
         - avatar
-        - followerCount
-        - followingCount
-        - postCount
+        - totalFollowers
+        - totalSales
         - isVerified
+        - socialLinks
 
     Product:
       type: object
@@ -213,6 +242,8 @@ components:
           type: integer
         comments:
           type: integer
+        shares:
+          type: integer
         isLiked:
           type: boolean
         isFeatured:
@@ -221,6 +252,9 @@ components:
           type: boolean
         badge:
           type: string
+        platform:
+          type: string
+          description: "Source platform: instagram, facebook, tiktok"
         postedAt:
           type: string
         sellerUsername:
@@ -238,9 +272,11 @@ components:
         - tags
         - likes
         - comments
+        - shares
         - isLiked
         - isFeatured
         - isSoldOut
+        - platform
         - postedAt
         - sellerUsername
         - sellerAvatar
@@ -276,8 +312,11 @@ components:
           type: string
         category:
           type: string
+        productCount:
+          type: integer
       required:
         - id
         - title
         - coverImage
         - category
+        - productCount
