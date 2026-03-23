@@ -5,6 +5,48 @@ import { eq, and, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
+router.get("/oembed", async (req, res) => {
+  const { url } = req.query as { url?: string };
+  if (!url) { res.status(400).json({ error: "url query param is required" }); return; }
+
+  const INSTAGRAM_HOSTS = new Set(["instagram.com", "www.instagram.com"]);
+  const TIKTOK_HOSTS = new Set(["tiktok.com", "www.tiktok.com", "vm.tiktok.com"]);
+
+  let oembedUrl: string | null = null;
+  try {
+    const parsed = new URL(url);
+    if (parsed.protocol !== "https:") {
+      res.status(400).json({ error: "Only HTTPS URLs are supported" });
+      return;
+    }
+    if (INSTAGRAM_HOSTS.has(parsed.hostname)) {
+      oembedUrl = `https://api.instagram.com/oembed/?url=${encodeURIComponent(url)}&omitscript=false`;
+    } else if (TIKTOK_HOSTS.has(parsed.hostname)) {
+      oembedUrl = `https://www.tiktok.com/oembed?url=${encodeURIComponent(url)}`;
+    } else {
+      res.status(400).json({ error: "Unsupported platform. Only Instagram and TikTok are supported." });
+      return;
+    }
+  } catch {
+    res.status(400).json({ error: "Invalid URL" });
+    return;
+  }
+
+  try {
+    const response = await fetch(oembedUrl, {
+      headers: { "User-Agent": "Mozilla/5.0 (compatible; SocialShopBot/1.0)" },
+    });
+    if (!response.ok) {
+      res.status(502).json({ error: `Upstream oEmbed request failed with status ${response.status}` });
+      return;
+    }
+    const data = await response.json() as Record<string, unknown>;
+    res.json({ html: data.html ?? null, title: data.title ?? null, thumbnail_url: data.thumbnail_url ?? null });
+  } catch (e) {
+    res.status(502).json({ error: "Failed to fetch oEmbed data from upstream" });
+  }
+});
+
 router.post("/products/:id/like", async (req, res) => {
   if (!req.isAuthenticated()) { res.status(401).json({ error: "Unauthorized" }); return; }
   const productId = parseInt(req.params.id, 10);

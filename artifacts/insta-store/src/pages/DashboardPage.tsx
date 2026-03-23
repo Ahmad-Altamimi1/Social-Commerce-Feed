@@ -3,6 +3,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard, Plus, Package, ShoppingCart, BarChart3, CheckCircle, Truck, Clock, XCircle,
   LogIn, Store, Edit, Trash2, X, ImagePlus, Tag, DollarSign, AlignLeft, Layers, Link2, Star,
+  PenLine, Link,
 } from "lucide-react";
 import { MobileContainer } from "@/components/layout/MobileContainer";
 import { useAuth } from "@/lib/auth";
@@ -61,6 +62,8 @@ const EMPTY_FORM: ProductFormData = {
   postUrl: "",
 };
 
+type WizardMode = "pick" | "scratch" | "social";
+
 function ProductSheet({
   open,
   onClose,
@@ -75,6 +78,7 @@ function ProductSheet({
   onSuccess: () => void;
 }) {
   const { toast } = useToast();
+  const [wizardMode, setWizardMode] = useState<WizardMode>(productId ? "scratch" : "pick");
   const [form, setForm] = useState<ProductFormData>(initial ?? EMPTY_FORM);
   const { mutateAsync: create, isPending: creating } = useCreateProduct();
   const { mutateAsync: update, isPending: updating } = useUpdateProduct();
@@ -83,10 +87,27 @@ function ProductSheet({
   const set = (key: keyof ProductFormData, value: string | boolean) =>
     setForm((f) => ({ ...f, [key]: value }));
 
+  const hasPostUrl = form.postUrl.trim().length > 0;
+  const imagesRequired = wizardMode !== "social";
+
   const handleSubmit = async () => {
     if (!form.title.trim()) { toast({ title: "Product title is required", variant: "destructive" }); return; }
     if (!form.price || isNaN(Number(form.price))) { toast({ title: "Valid price is required", variant: "destructive" }); return; }
-    if (!form.images.trim()) { toast({ title: "At least one image URL is required", variant: "destructive" }); return; }
+    if (imagesRequired && !form.images.trim()) { toast({ title: "At least one image URL is required", variant: "destructive" }); return; }
+    if (wizardMode === "social") {
+      if (!form.postUrl.trim()) { toast({ title: "Please enter a social post URL", variant: "destructive" }); return; }
+      try {
+        const parsedPost = new URL(form.postUrl.trim());
+        const validHosts = ["instagram.com", "www.instagram.com", "tiktok.com", "www.tiktok.com", "vm.tiktok.com"];
+        if (!validHosts.includes(parsedPost.hostname)) {
+          toast({ title: "Invalid post URL", description: "Only Instagram and TikTok post URLs are supported.", variant: "destructive" });
+          return;
+        }
+      } catch {
+        toast({ title: "Invalid post URL", description: "Please enter a valid URL.", variant: "destructive" });
+        return;
+      }
+    }
 
     const images = form.images.split("\n").map((s) => s.trim()).filter(Boolean);
     const tags = form.tags.split(",").map((s) => s.trim()).filter(Boolean);
@@ -113,17 +134,23 @@ function ProductSheet({
         toast({ title: "Product created!", description: "It's now live in your store." });
       }
       onSuccess();
-      onClose();
+      handleClose();
     } catch (e: any) {
       toast({ title: "Error", description: e.message ?? "Something went wrong", variant: "destructive" });
     }
+  };
+
+  const handleClose = () => {
+    setWizardMode(productId ? "scratch" : "pick");
+    setForm(initial ?? EMPTY_FORM);
+    onClose();
   };
 
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ maxWidth: 428, margin: "0 auto" }}>
-      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleClose} />
       <div className="relative bg-background rounded-t-3xl max-h-[92dvh] flex flex-col shadow-2xl">
         {/* Handle */}
         <div className="flex justify-center pt-3 pb-1 shrink-0">
@@ -132,204 +159,298 @@ function ProductSheet({
 
         {/* Title bar */}
         <div className="flex items-center justify-between px-5 pb-3 pt-1 border-b border-border shrink-0">
-          <h2 className="font-display font-bold text-lg">{productId ? "Edit Product" : "Add New Product"}</h2>
-          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-muted active:bg-muted/70 transition-colors">
+          <div className="flex items-center gap-2">
+            {wizardMode !== "pick" && !productId && (
+              <button
+                onClick={() => setWizardMode("pick")}
+                className="w-7 h-7 flex items-center justify-center rounded-full bg-muted active:bg-muted/70 transition-colors mr-1"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" strokeWidth={2.5} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" /></svg>
+              </button>
+            )}
+            <h2 className="font-display font-bold text-lg">
+              {productId ? "Edit Product" : wizardMode === "pick" ? "Add New Product" : wizardMode === "social" ? "Link a Social Post" : "Start from Scratch"}
+            </h2>
+          </div>
+          <button onClick={handleClose} className="w-8 h-8 flex items-center justify-center rounded-full bg-muted active:bg-muted/70 transition-colors">
             <X className="w-4 h-4" />
           </button>
         </div>
 
-        {/* Form scroll area */}
-        <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
-          {/* Title */}
-          <div>
-            <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-              <Layers className="w-3 h-3" /> Product Title <span className="text-primary">*</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. Vintage Floral Dress"
-              value={form.title}
-              onChange={(e) => set("title", e.target.value)}
-              className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-              <AlignLeft className="w-3 h-3" /> Description
-            </label>
-            <textarea
-              placeholder="Describe your product..."
-              value={form.description}
-              onChange={(e) => set("description", e.target.value)}
-              rows={3}
-              className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
-            />
-          </div>
-
-          {/* Price row */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-                <DollarSign className="w-3 h-3" /> Price <span className="text-primary">*</span>
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="29.99"
-                value={form.price}
-                onChange={(e) => set("price", e.target.value)}
-                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-              />
-            </div>
-            <div>
-              <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-                <DollarSign className="w-3 h-3" /> Original Price
-              </label>
-              <input
-                type="number"
-                min="0"
-                step="0.01"
-                placeholder="49.99"
-                value={form.originalPrice}
-                onChange={(e) => set("originalPrice", e.target.value)}
-                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-              />
-            </div>
-          </div>
-
-          {/* Category + Platform */}
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="field-label text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5 block">Category</label>
-              <select
-                value={form.category}
-                onChange={(e) => set("category", e.target.value)}
-                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all capitalize"
-              >
-                {CATEGORIES.map((c) => <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="field-label text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5 block">Platform</label>
-              <select
-                value={form.platform}
-                onChange={(e) => set("platform", e.target.value)}
-                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-              >
-                {PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-              </select>
-            </div>
-          </div>
-
-          {/* Badge + Featured */}
-          <div className="grid grid-cols-2 gap-3 items-end">
-            <div>
-              <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-                <Star className="w-3 h-3" /> Badge
-              </label>
-              <select
-                value={form.badge}
-                onChange={(e) => set("badge", e.target.value)}
-                className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-              >
-                {BADGES.map((b) => <option key={b} value={b}>{b || "None"}</option>)}
-              </select>
-            </div>
+        {/* Step 1: Picker (new products only) */}
+        {wizardMode === "pick" && (
+          <div className="flex-1 px-5 py-6 flex flex-col gap-4">
+            <p className="text-sm text-muted-foreground text-center">How would you like to add your product?</p>
             <button
-              type="button"
-              onClick={() => set("isFeatured", !form.isFeatured)}
-              className={cn(
-                "flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-semibold transition-all",
-                form.isFeatured
-                  ? "bg-primary/10 border-primary text-primary"
-                  : "bg-card border-border text-muted-foreground"
-              )}
+              onClick={() => { setForm({ ...EMPTY_FORM }); setWizardMode("scratch"); }}
+              className="flex items-start gap-4 p-5 bg-card border-2 border-border rounded-2xl hover:border-primary/40 hover:bg-primary/5 active:scale-[0.98] transition-all text-left"
             >
-              <Star className={cn("w-4 h-4", form.isFeatured ? "fill-primary text-primary" : "")} />
-              Featured
+              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <PenLine className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-bold text-base">Start from scratch</p>
+                <p className="text-sm text-muted-foreground mt-0.5">Enter product details manually and upload your own images.</p>
+              </div>
+            </button>
+            <button
+              onClick={() => { setForm({ ...EMPTY_FORM, platform: "instagram" }); setWizardMode("social"); }}
+              className="flex items-start gap-4 p-5 bg-card border-2 border-border rounded-2xl hover:border-primary/40 hover:bg-primary/5 active:scale-[0.98] transition-all text-left"
+            >
+              <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
+                <Link className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <p className="font-bold text-base">Link a social post</p>
+                <p className="text-sm text-muted-foreground mt-0.5">Paste an Instagram or TikTok post URL. The post will be embedded in your product — no image required.</p>
+              </div>
             </button>
           </div>
+        )}
 
-          {/* Tags */}
-          <div>
-            <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-              <Tag className="w-3 h-3" /> Tags <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">(comma-separated)</span>
-            </label>
-            <input
-              type="text"
-              placeholder="e.g. summer, floral, women, trendy"
-              value={form.tags}
-              onChange={(e) => set("tags", e.target.value)}
-              className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-            />
-          </div>
+        {/* Step 2: Form */}
+        {wizardMode !== "pick" && (
+          <>
+            <div className="overflow-y-auto flex-1 px-5 py-4 space-y-5">
+              {/* Social post fields — shown first & prominently for social mode */}
+              {wizardMode === "social" && (
+                <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 space-y-4">
+                  <p className="text-xs font-bold uppercase tracking-wide text-primary">Social Post Details</p>
+                  <div>
+                    <label className="field-label text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5 block">Platform</label>
+                    <select
+                      value={form.platform}
+                      onChange={(e) => set("platform", e.target.value)}
+                      className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                    >
+                      {PLATFORMS.filter((p) => p.value !== "facebook").map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                      <Link2 className="w-3 h-3" /> Post URL <span className="text-primary">*</span>
+                    </label>
+                    <input
+                      type="url"
+                      placeholder={
+                        form.platform === "instagram"
+                          ? "https://www.instagram.com/p/ABC123/"
+                          : "https://www.tiktok.com/@user/video/1234567890"
+                      }
+                      value={form.postUrl}
+                      onChange={(e) => set("postUrl", e.target.value)}
+                      className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                    />
+                    {form.postUrl.trim() && (
+                      <p className="text-[11px] text-green-600 mt-1.5 flex items-center gap-1">
+                        <span>✓</span> The post will be embedded in the product detail view
+                      </p>
+                    )}
+                  </div>
+                </div>
+              )}
 
-          {/* Images */}
-          <div>
-            <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-              <ImagePlus className="w-3 h-3" /> Image URLs <span className="text-primary">*</span>
-              <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">(one per line)</span>
-            </label>
-            <textarea
-              placeholder={"https://images.unsplash.com/photo-...\nhttps://images.unsplash.com/photo-..."}
-              value={form.images}
-              onChange={(e) => set("images", e.target.value)}
-              rows={3}
-              className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none font-mono text-xs"
-            />
-            {/* Image previews */}
-            {form.images.trim() && (
-              <div className="flex gap-2 mt-2 flex-wrap">
-                {form.images.split("\n").map((url) => url.trim()).filter(Boolean).map((url, i) => (
-                  <img key={i} src={url} alt="" className="w-14 h-14 rounded-lg object-cover bg-muted border border-border" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }} />
-                ))}
+              {/* Title */}
+              <div>
+                <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                  <Layers className="w-3 h-3" /> Product Title <span className="text-primary">*</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. Vintage Floral Dress"
+                  value={form.title}
+                  onChange={(e) => set("title", e.target.value)}
+                  className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                />
               </div>
-            )}
-          </div>
 
-          {/* Social Post URL */}
-          <div>
-            <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-              <Link2 className="w-3 h-3" /> Social Post URL
-              <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">(optional — embeds original post)</span>
-            </label>
-            <input
-              type="url"
-              placeholder={
-                form.platform === "instagram"
-                  ? "https://www.instagram.com/p/ABC123/"
-                  : form.platform === "tiktok"
-                  ? "https://www.tiktok.com/@user/video/1234567890"
-                  : "https://www.facebook.com/your_page/posts/123456"
-              }
-              value={form.postUrl}
-              onChange={(e) => set("postUrl", e.target.value)}
-              className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-            />
-            {form.postUrl.trim() && (
-              <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1">
-                <span className="text-green-500">✓</span>
-                The original post will be embedded in the product detail view
-              </p>
-            )}
-          </div>
+              {/* Description */}
+              <div>
+                <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                  <AlignLeft className="w-3 h-3" /> Description
+                </label>
+                <textarea
+                  placeholder="Describe your product..."
+                  value={form.description}
+                  onChange={(e) => set("description", e.target.value)}
+                  rows={3}
+                  className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none"
+                />
+              </div>
 
-          <div className="h-4" />
-        </div>
+              {/* Price row */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    <DollarSign className="w-3 h-3" /> Price <span className="text-primary">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="29.99"
+                    value={form.price}
+                    onChange={(e) => set("price", e.target.value)}
+                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                  />
+                </div>
+                <div>
+                  <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    <DollarSign className="w-3 h-3" /> Original Price
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    placeholder="49.99"
+                    value={form.originalPrice}
+                    onChange={(e) => set("originalPrice", e.target.value)}
+                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                  />
+                </div>
+              </div>
 
-        {/* Submit button */}
-        <div className="shrink-0 px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-3 border-t border-border bg-background">
-          <button
-            onClick={handleSubmit}
-            disabled={isPending}
-            className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-all text-base disabled:opacity-60"
-          >
-            {isPending ? (productId ? "Saving..." : "Creating...") : (productId ? "Save Changes" : "Create Product")}
-          </button>
-        </div>
+              {/* Category + Platform (scratch mode shows platform selector here) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="field-label text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5 block">Category</label>
+                  <select
+                    value={form.category}
+                    onChange={(e) => set("category", e.target.value)}
+                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all capitalize"
+                  >
+                    {CATEGORIES.map((c) => <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
+                  </select>
+                </div>
+                {wizardMode === "scratch" && (
+                  <div>
+                    <label className="field-label text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5 block">Platform</label>
+                    <select
+                      value={form.platform}
+                      onChange={(e) => set("platform", e.target.value)}
+                      className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                    >
+                      {PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Badge + Featured */}
+              <div className="grid grid-cols-2 gap-3 items-end">
+                <div>
+                  <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    <Star className="w-3 h-3" /> Badge
+                  </label>
+                  <select
+                    value={form.badge}
+                    onChange={(e) => set("badge", e.target.value)}
+                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                  >
+                    {BADGES.map((b) => <option key={b} value={b}>{b || "None"}</option>)}
+                  </select>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => set("isFeatured", !form.isFeatured)}
+                  className={cn(
+                    "flex items-center justify-center gap-2 py-3 rounded-xl border text-sm font-semibold transition-all",
+                    form.isFeatured
+                      ? "bg-primary/10 border-primary text-primary"
+                      : "bg-card border-border text-muted-foreground"
+                  )}
+                >
+                  <Star className={cn("w-4 h-4", form.isFeatured ? "fill-primary text-primary" : "")} />
+                  Featured
+                </button>
+              </div>
+
+              {/* Tags */}
+              <div>
+                <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                  <Tag className="w-3 h-3" /> Tags <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">(comma-separated)</span>
+                </label>
+                <input
+                  type="text"
+                  placeholder="e.g. summer, floral, women, trendy"
+                  value={form.tags}
+                  onChange={(e) => set("tags", e.target.value)}
+                  className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                />
+              </div>
+
+              {/* Images */}
+              <div>
+                <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                  <ImagePlus className="w-3 h-3" /> Image URLs
+                  {imagesRequired ? <span className="text-primary">*</span> : <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">(optional — embed will serve as visual)</span>}
+                  {imagesRequired && <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">(one per line)</span>}
+                </label>
+                <textarea
+                  placeholder={"https://images.unsplash.com/photo-...\nhttps://images.unsplash.com/photo-..."}
+                  value={form.images}
+                  onChange={(e) => set("images", e.target.value)}
+                  rows={3}
+                  className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all resize-none font-mono text-xs"
+                />
+                {form.images.trim() && (
+                  <div className="flex gap-2 mt-2 flex-wrap">
+                    {form.images.split("\n").map((url) => url.trim()).filter(Boolean).map((url, i) => (
+                      <img key={i} src={url} alt="" className="w-14 h-14 rounded-lg object-cover bg-muted border border-border" onError={(e) => { (e.target as HTMLImageElement).style.opacity = "0.3"; }} />
+                    ))}
+                  </div>
+                )}
+                {wizardMode === "social" && !form.images.trim() && hasPostUrl && (
+                  <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1">
+                    <span className="text-blue-500">ℹ</span> The embedded social post will serve as the product visual
+                  </p>
+                )}
+              </div>
+
+              {/* Social Post URL (scratch mode) */}
+              {wizardMode === "scratch" && (
+                <div>
+                  <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    <Link2 className="w-3 h-3" /> Social Post URL
+                    <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">(optional — embeds original post)</span>
+                  </label>
+                  <input
+                    type="url"
+                    placeholder={
+                      form.platform === "instagram"
+                        ? "https://www.instagram.com/p/ABC123/"
+                        : form.platform === "tiktok"
+                        ? "https://www.tiktok.com/@user/video/1234567890"
+                        : "https://www.facebook.com/your_page/posts/123456"
+                    }
+                    value={form.postUrl}
+                    onChange={(e) => set("postUrl", e.target.value)}
+                    className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
+                  />
+                  {form.postUrl.trim() && (
+                    <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1">
+                      <span className="text-green-500">✓</span>
+                      The original post will be embedded in the product detail view
+                    </p>
+                  )}
+                </div>
+              )}
+
+              <div className="h-4" />
+            </div>
+
+            {/* Submit button */}
+            <div className="shrink-0 px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-3 border-t border-border bg-background">
+              <button
+                onClick={handleSubmit}
+                disabled={isPending}
+                className="w-full bg-primary text-white font-bold py-4 rounded-2xl shadow-lg shadow-primary/20 active:scale-[0.98] transition-all text-base disabled:opacity-60"
+              >
+                {isPending ? (productId ? "Saving..." : "Creating...") : (productId ? "Save Changes" : "Create Product")}
+              </button>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

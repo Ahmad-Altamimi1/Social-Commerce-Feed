@@ -12,30 +12,76 @@ import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 
-function getSocialEmbedUrl(postUrl: string, platform: string): string | null {
-  try {
-    const url = new URL(postUrl);
-    if (platform === "instagram" || url.hostname.includes("instagram.com")) {
-      const match = url.pathname.match(/\/p\/([A-Za-z0-9_-]+)/);
-      if (match) return `https://www.instagram.com/p/${match[1]}/embed/captioned/`;
-    }
-    if (platform === "tiktok" || url.hostname.includes("tiktok.com")) {
-      const match = url.pathname.match(/\/video\/(\d+)/);
-      if (match) return `https://www.tiktok.com/embed/v2/${match[1]}`;
-    }
-    if (platform === "facebook" || url.hostname.includes("facebook.com")) {
-      return `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(postUrl)}&show_text=true&width=380&appId=`;
-    }
-  } catch {}
-  return null;
+function isSupportedOembedPlatform(platform: string): boolean {
+  return platform === "instagram" || platform === "tiktok";
 }
 
 function SocialPostEmbed({ postUrl, platform }: { postUrl: string; platform: string }) {
-  const [loaded, setLoaded] = useState(false);
+  const [embedHtml, setEmbedHtml] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
-  const embedUrl = getSocialEmbedUrl(postUrl, platform);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-  if (!embedUrl || failed) {
+  useEffect(() => {
+    if (!isSupportedOembedPlatform(platform)) {
+      setLoading(false);
+      setFailed(true);
+      return;
+    }
+
+    let cancelled = false;
+    setLoading(true);
+    setFailed(false);
+    setEmbedHtml(null);
+
+    const apiBase = import.meta.env.BASE_URL?.replace(/\/$/, "") || "";
+    fetch(`${apiBase}/api/oembed?url=${encodeURIComponent(postUrl)}`)
+      .then((r) => {
+        if (!r.ok) throw new Error("oembed failed");
+        return r.json() as Promise<{ html: string | null }>;
+      })
+      .then((data) => {
+        if (cancelled) return;
+        if (data.html) {
+          setEmbedHtml(data.html);
+        } else {
+          setFailed(true);
+        }
+        setLoading(false);
+      })
+      .catch(() => {
+        if (!cancelled) { setFailed(true); setLoading(false); }
+      });
+
+    return () => { cancelled = true; };
+  }, [postUrl, platform]);
+
+  useEffect(() => {
+    if (!embedHtml || !containerRef.current) return;
+    const container = containerRef.current;
+    container.innerHTML = embedHtml;
+    const scripts = container.querySelectorAll("script");
+    scripts.forEach((oldScript) => {
+      const newScript = document.createElement("script");
+      if (oldScript.src) {
+        newScript.src = oldScript.src;
+        newScript.async = true;
+      } else {
+        newScript.textContent = oldScript.textContent;
+      }
+      oldScript.replaceWith(newScript);
+    });
+  }, [embedHtml]);
+
+  if (loading) {
+    return (
+      <div className="mx-5 my-3 rounded-2xl border border-border bg-card flex items-center justify-center" style={{ minHeight: 200 }}>
+        <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+      </div>
+    );
+  }
+
+  if (failed || !embedHtml) {
     return (
       <a
         href={postUrl}
@@ -49,26 +95,9 @@ function SocialPostEmbed({ postUrl, platform }: { postUrl: string; platform: str
     );
   }
 
-  const heights: Record<string, number> = { instagram: 560, tiktok: 740, facebook: 320 };
-  const height = heights[platform] ?? 500;
-
   return (
-    <div className="mx-5 my-3 rounded-2xl overflow-hidden border border-border bg-card relative" style={{ minHeight: loaded ? undefined : height }}>
-      {!loaded && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
-        </div>
-      )}
-      <iframe
-        src={embedUrl}
-        className="w-full border-none block"
-        style={{ height, opacity: loaded ? 1 : 0, transition: "opacity 0.3s" }}
-        scrolling="no"
-        allowFullScreen
-        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture"
-        onLoad={() => setLoaded(true)}
-        onError={() => setFailed(true)}
-      />
+    <div className="mx-5 my-3 rounded-2xl overflow-hidden border border-border bg-card">
+      <div ref={containerRef} className="w-full" />
     </div>
   );
 }
