@@ -3,6 +3,7 @@ import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerHeader } f
 import {
   useGetProduct, useAddToCart, useToggleProductLike,
   useListProductComments, useAddProductComment,
+  getGetProductQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Heart, MessageCircle, Send, Bookmark, ShoppingBag, Store, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
@@ -99,6 +100,8 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
   const commentInputRef = useRef<HTMLInputElement>(null);
+  const commentsRef = useRef<HTMLDivElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (product) {
@@ -134,6 +137,7 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
       const result = await toggleLike({ id: product.id });
       setIsLiked(result.liked);
       setLikeCount(result.likeCount);
+      queryClient.invalidateQueries({ queryKey: getGetProductQueryKey(product.id) });
     } catch {
       setIsLiked(prevLiked);
       setLikeCount(prevCount);
@@ -153,10 +157,12 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
     }
   };
 
-  const handleCommentIconClick = () => {
-    if (!isAuthenticated) { login(); return; }
+  const openComments = (focusInput = false) => {
     setShowComments(true);
-    setTimeout(() => commentInputRef.current?.focus(), 100);
+    setTimeout(() => {
+      commentsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      if (focusInput && isAuthenticated) commentInputRef.current?.focus();
+    }, 80);
   };
 
   const platform = (product as any)?.platform || "instagram";
@@ -179,7 +185,7 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
             <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto no-scrollbar pb-28">
+          <div ref={scrollRef} className="flex-1 overflow-y-auto no-scrollbar pb-28">
             {/* Seller header */}
             <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-background/95 backdrop-blur-md z-10">
               <div className="flex items-center gap-3">
@@ -247,9 +253,9 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
                 </button>
 
                 {/* Comment button */}
-                <button onClick={handleCommentIconClick} className="flex flex-col items-center gap-1 group">
-                  <MessageCircle className="w-6 h-6 text-muted-foreground transition-transform group-active:scale-75" />
-                  <span className="text-xs font-semibold text-muted-foreground">{comments?.length ?? product.comments}</span>
+                <button onClick={() => openComments(true)} className="flex flex-col items-center gap-1 group">
+                  <MessageCircle className={cn("w-6 h-6 transition-transform group-active:scale-75", showComments ? "text-primary fill-primary/10" : "text-muted-foreground")} />
+                  <span className={cn("text-xs font-semibold", showComments ? "text-primary" : "text-muted-foreground")}>{comments?.length ?? product.comments}</span>
                 </button>
 
                 <button className="flex flex-col items-center gap-1 group">
@@ -288,9 +294,9 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
             </div>
 
             {/* Comments Section */}
-            <div className="px-5 pb-4">
+            <div ref={commentsRef} className="px-5 pb-4">
               <button
-                onClick={() => setShowComments(!showComments)}
+                onClick={() => showComments ? setShowComments(false) : openComments()}
                 className="w-full flex items-center justify-between py-3 border-t border-border/50"
               >
                 <span className="font-semibold text-sm">
@@ -302,25 +308,34 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
               {showComments && (
                 <div className="space-y-3 mt-2">
                   {/* Comment input */}
-                  <div className="flex items-center gap-2">
-                    <input
-                      ref={commentInputRef}
-                      type="text"
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      onKeyDown={(e) => { if (e.key === "Enter") handleComment(); }}
-                      placeholder={isAuthenticated ? "Add a comment..." : "Sign in to comment"}
-                      disabled={!isAuthenticated || commenting}
-                      className="flex-1 bg-muted/60 border border-border rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all disabled:opacity-50"
-                    />
+                  {isAuthenticated ? (
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={commentInputRef}
+                        type="text"
+                        value={commentText}
+                        onChange={(e) => setCommentText(e.target.value)}
+                        onKeyDown={(e) => { if (e.key === "Enter") handleComment(); }}
+                        placeholder="Add a comment..."
+                        disabled={commenting}
+                        className="flex-1 bg-muted/60 border border-border rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all"
+                      />
+                      <button
+                        onClick={handleComment}
+                        disabled={!commentText.trim() || commenting}
+                        className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-40 active:scale-90 transition-all"
+                      >
+                        {commenting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  ) : (
                     <button
-                      onClick={handleComment}
-                      disabled={!commentText.trim() || commenting || !isAuthenticated}
-                      className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-40 active:scale-90 transition-all"
+                      onClick={login}
+                      className="w-full py-2.5 rounded-full bg-primary/10 border border-primary/20 text-primary text-sm font-semibold hover:bg-primary/20 transition-colors"
                     >
-                      {commenting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                      Sign in to join the conversation
                     </button>
-                  </div>
+                  )}
 
                   {/* Comment list */}
                   {!comments?.length ? (
