@@ -27,6 +27,7 @@ export interface Product {
   platform: string;
   /** URL of the original social media post to embed */
   postUrl?: string;
+  isLikedByMe?: boolean;
   postedAt: string;
   sellerUsername: string;
   sellerAvatar: string;

@@ -17,9 +17,11 @@ import type {
 } from "@tanstack/react-query";
 
 import type {
+  AddCommentBody,
   AddToCartBody,
   Cart,
   Category,
+  Comment,
   CreateOrderBody,
   CreateProductBody,
   ErrorResponse,
@@ -29,6 +31,7 @@ import type {
   GetMerchantProductsParams,
   HealthStatus,
   Highlight,
+  LikeResponse,
   ListProductsParams,
   Merchant,
   MerchantOrder,
@@ -1393,6 +1396,264 @@ export function useGetProduct<
 
   return { ...query, queryKey: queryOptions.queryKey };
 }
+
+/**
+ * @summary Toggle like on a product (requires auth)
+ */
+export const getToggleProductLikeUrl = (id: number) => {
+  return `/api/products/${id}/like`;
+};
+
+export const toggleProductLike = async (
+  id: number,
+  options?: RequestInit,
+): Promise<LikeResponse> => {
+  return customFetch<LikeResponse>(getToggleProductLikeUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getToggleProductLikeMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toggleProductLike>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof toggleProductLike>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["toggleProductLike"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof toggleProductLike>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+
+    return toggleProductLike(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ToggleProductLikeMutationResult = NonNullable<
+  Awaited<ReturnType<typeof toggleProductLike>>
+>;
+
+export type ToggleProductLikeMutationError = ErrorType<void>;
+
+/**
+ * @summary Toggle like on a product (requires auth)
+ */
+export const useToggleProductLike = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof toggleProductLike>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof toggleProductLike>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  return useMutation(getToggleProductLikeMutationOptions(options));
+};
+
+/**
+ * @summary List comments for a product
+ */
+export const getListProductCommentsUrl = (id: number) => {
+  return `/api/products/${id}/comments`;
+};
+
+export const listProductComments = async (
+  id: number,
+  options?: RequestInit,
+): Promise<Comment[]> => {
+  return customFetch<Comment[]>(getListProductCommentsUrl(id), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getListProductCommentsQueryKey = (id: number) => {
+  return [`/api/products/${id}/comments`] as const;
+};
+
+export const getListProductCommentsQueryOptions = <
+  TData = Awaited<ReturnType<typeof listProductComments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProductComments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+
+  const queryKey = queryOptions?.queryKey ?? getListProductCommentsQueryKey(id);
+
+  const queryFn: QueryFunction<
+    Awaited<ReturnType<typeof listProductComments>>
+  > = ({ signal }) => listProductComments(id, { signal, ...requestOptions });
+
+  return {
+    queryKey,
+    queryFn,
+    enabled: !!id,
+    ...queryOptions,
+  } as UseQueryOptions<
+    Awaited<ReturnType<typeof listProductComments>>,
+    TError,
+    TData
+  > & { queryKey: QueryKey };
+};
+
+export type ListProductCommentsQueryResult = NonNullable<
+  Awaited<ReturnType<typeof listProductComments>>
+>;
+export type ListProductCommentsQueryError = ErrorType<unknown>;
+
+/**
+ * @summary List comments for a product
+ */
+
+export function useListProductComments<
+  TData = Awaited<ReturnType<typeof listProductComments>>,
+  TError = ErrorType<unknown>,
+>(
+  id: number,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof listProductComments>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getListProductCommentsQueryOptions(id, options);
+
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Add a comment to a product (requires auth)
+ */
+export const getAddProductCommentUrl = (id: number) => {
+  return `/api/products/${id}/comments`;
+};
+
+export const addProductComment = async (
+  id: number,
+  addCommentBody: AddCommentBody,
+  options?: RequestInit,
+): Promise<Comment> => {
+  return customFetch<Comment>(getAddProductCommentUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(addCommentBody),
+  });
+};
+
+export const getAddProductCommentMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addProductComment>>,
+    TError,
+    { id: number; data: BodyType<AddCommentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof addProductComment>>,
+  TError,
+  { id: number; data: BodyType<AddCommentBody> },
+  TContext
+> => {
+  const mutationKey = ["addProductComment"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof addProductComment>>,
+    { id: number; data: BodyType<AddCommentBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return addProductComment(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type AddProductCommentMutationResult = NonNullable<
+  Awaited<ReturnType<typeof addProductComment>>
+>;
+export type AddProductCommentMutationBody = BodyType<AddCommentBody>;
+export type AddProductCommentMutationError = ErrorType<void>;
+
+/**
+ * @summary Add a comment to a product (requires auth)
+ */
+export const useAddProductComment = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof addProductComment>>,
+    TError,
+    { id: number; data: BodyType<AddCommentBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof addProductComment>>,
+  TError,
+  { id: number; data: BodyType<AddCommentBody> },
+  TContext
+> => {
+  return useMutation(getAddProductCommentMutationOptions(options));
+};
 
 /**
  * @summary List all categories

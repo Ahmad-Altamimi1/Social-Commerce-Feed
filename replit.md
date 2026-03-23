@@ -81,6 +81,11 @@ Seeded merchants: Luxe Boutique (@luxe.boutique), Nomad Gear Co. (@nomad.gear), 
 - `GET /api/auth/user` — current auth state
 - `GET /api/login`, `GET /api/callback`, `GET /api/logout` — auth flow
 
+### Social (likes/comments)
+- `POST /api/products/:id/like` — toggle like on a product (authenticated); returns `{ liked, likeCount }`
+- `GET /api/products/:id/comments` — list comments for a product (public)
+- `POST /api/products/:id/comments` — add a comment (authenticated); returns new comment object
+
 ### Authenticated (requires session)
 - `GET /api/cart`, `POST /api/cart`, `PUT /api/cart/:itemId`, `DELETE /api/cart/:itemId`, `DELETE /api/cart`
 - `POST /api/orders` — checkout (creates order from cart, clears cart)

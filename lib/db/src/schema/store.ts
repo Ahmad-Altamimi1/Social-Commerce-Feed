@@ -107,6 +107,21 @@ export const orderItemsTable = pgTable("order_items", {
   merchantUsername: text("merchant_username").notNull(),
 });
 
+export const productLikesTable = pgTable("product_likes", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => usersTable.id),
+  productId: integer("product_id").notNull().references(() => productsTable.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const productCommentsTable = pgTable("product_comments", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id").notNull().references(() => usersTable.id),
+  productId: integer("product_id").notNull().references(() => productsTable.id),
+  text: text("text").notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Keep the old table for backwards compat (unused but referenced)
 export const storeProfilesTable = merchantsTable;
 

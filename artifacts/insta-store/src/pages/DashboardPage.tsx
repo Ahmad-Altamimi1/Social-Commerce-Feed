@@ -489,6 +489,8 @@ export default function DashboardPage() {
 
   const totalRevenue = orders?.reduce((s, o) => s + o.total, 0) ?? 0;
   const pendingOrders = orders?.filter((o) => o.status === "pending").length ?? 0;
+  const totalLikes = products?.reduce((s, p) => s + ((p as any).likes ?? 0), 0) ?? 0;
+  const totalComments = products?.reduce((s, p) => s + ((p as any).comments ?? 0), 0) ?? 0;
 
   return (
     <MobileContainer>
@@ -557,6 +559,8 @@ export default function DashboardPage() {
                 { label: "Orders", value: orders?.length ?? 0, sub: `${pendingOrders} pending` },
                 { label: "Products", value: products?.length ?? 0, sub: "Listed" },
                 { label: "Rating", value: merchant.rating > 0 ? `${merchant.rating}★` : "—", sub: `${merchant.reviewCount} reviews` },
+                { label: "Total Likes", value: totalLikes.toLocaleString(), sub: "Across all products" },
+                { label: "Comments", value: totalComments.toLocaleString(), sub: "Across all products" },
               ].map(({ label, value, sub }) => (
                 <div key={label} className="bg-card rounded-2xl border border-border/50 p-3.5">
                   <p className="text-xs text-muted-foreground mb-0.5">{label}</p>

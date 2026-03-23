@@ -1,10 +1,18 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { merchantsTable, productsTable, categoriesTable, highlightsTable } from "@workspace/db";
+import { merchantsTable, productsTable, categoriesTable, highlightsTable, productLikesTable } from "@workspace/db";
+import { and, eq } from "drizzle-orm";
 
 const router: IRouter = Router();
 
-function formatProduct(r: typeof productsTable.$inferSelect) {
+async function formatProduct(r: typeof productsTable.$inferSelect, userId?: string) {
+  let isLikedByMe = false;
+  if (userId) {
+    const like = await db.select().from(productLikesTable).where(
+      and(eq(productLikesTable.userId, userId), eq(productLikesTable.productId, r.id))
+    );
+    isLikedByMe = like.length > 0;
+  }
   return {
     id: r.id,
     merchantId: r.merchantId,
@@ -23,6 +31,8 @@ function formatProduct(r: typeof productsTable.$inferSelect) {
     isSoldOut: r.isSoldOut,
     badge: r.badge,
     platform: r.platform,
+    postUrl: r.postUrl ?? undefined,
+    isLikedByMe,
     postedAt: r.postedAt.toISOString(),
     sellerUsername: r.sellerUsername,
     sellerAvatar: r.sellerAvatar,
@@ -64,7 +74,8 @@ router.get("/products", async (req, res) => {
   if (category && category !== "all") rows = rows.filter((r) => r.category === category);
   if (featured === "true") rows = rows.filter((r) => r.isFeatured);
   if (platform) rows = rows.filter((r) => r.platform === platform);
-  res.json(rows.map(formatProduct));
+  const userId = req.isAuthenticated() ? req.user.id : undefined;
+  res.json(await Promise.all(rows.map((r) => formatProduct(r, userId))));
 });
 
 router.get("/products/:id", async (req, res) => {
@@ -73,7 +84,8 @@ router.get("/products/:id", async (req, res) => {
   const rows = await db.select().from(productsTable);
   const r = rows.find((p) => p.id === id);
   if (!r) { res.status(404).json({ error: "Product not found" }); return; }
-  res.json(formatProduct(r));
+  const userId = req.isAuthenticated() ? req.user.id : undefined;
+  res.json(await formatProduct(r, userId));
 });
 
 router.get("/categories", async (_req, res) => {

@@ -1,12 +1,15 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerHeader } from "@/components/ui/drawer";
-import { useGetProduct, useAddToCart } from "@workspace/api-client-react";
-import { Heart, MessageCircle, Send, Bookmark, ShoppingBag, Store, ChevronRight, ExternalLink } from "lucide-react";
+import {
+  useGetProduct, useAddToCart, useToggleProductLike,
+  useListProductComments, useAddProductComment,
+} from "@workspace/api-client-react";
+import { useQueryClient } from "@tanstack/react-query";
+import { Heart, MessageCircle, Send, Bookmark, ShoppingBag, Store, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
 
 function getSocialEmbedUrl(postUrl: string, platform: string): string | null {
   try {
@@ -45,11 +48,7 @@ function SocialPostEmbed({ postUrl, platform }: { postUrl: string; platform: str
     );
   }
 
-  const heights: Record<string, number> = {
-    instagram: 560,
-    tiktok: 740,
-    facebook: 320,
-  };
+  const heights: Record<string, number> = { instagram: 560, tiktok: 740, facebook: 320 };
   const height = heights[platform] ?? 500;
 
   return (
@@ -84,20 +83,33 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
   });
   const { isAuthenticated, login } = useAuth();
   const { toast } = useToast();
-  const { mutateAsync: addToCart, isPending: addingToCart } = useAddToCart();
   const queryClient = useQueryClient();
 
+  const { mutateAsync: addToCart, isPending: addingToCart } = useAddToCart();
+  const { mutateAsync: toggleLike, isPending: liking } = useToggleProductLike();
+  const { data: comments, refetch: refetchComments } = useListProductComments(productId || 0, {
+    query: { enabled: !!productId }
+  });
+  const { mutateAsync: postComment, isPending: commenting } = useAddProductComment();
+
   const [isLiked, setIsLiked] = useState(false);
+  const [likeCount, setLikeCount] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
+  const [showComments, setShowComments] = useState(false);
+  const [commentText, setCommentText] = useState("");
+  const commentInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (product) {
-      setIsLiked(false);
+      setIsLiked((product as any).isLikedByMe ?? false);
+      setLikeCount(product.likes);
       setIsSaved(false);
       setActiveImage(0);
+      setShowComments(false);
+      setCommentText("");
     }
-  }, [product]);
+  }, [product?.id]);
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -111,18 +123,48 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
     }
   };
 
+  const handleLike = async () => {
+    if (!product) return;
+    if (!isAuthenticated) { login(); return; }
+    const prevLiked = isLiked;
+    const prevCount = likeCount;
+    setIsLiked(!prevLiked);
+    setLikeCount(prevLiked ? prevCount - 1 : prevCount + 1);
+    try {
+      const result = await toggleLike({ id: product.id });
+      setIsLiked(result.liked);
+      setLikeCount(result.likeCount);
+    } catch {
+      setIsLiked(prevLiked);
+      setLikeCount(prevCount);
+    }
+  };
+
+  const handleComment = async () => {
+    if (!product) return;
+    if (!isAuthenticated) { login(); return; }
+    if (!commentText.trim()) return;
+    try {
+      await postComment({ id: product.id, data: { text: commentText.trim() } });
+      setCommentText("");
+      refetchComments();
+    } catch {
+      toast({ title: "Could not post comment", variant: "destructive" });
+    }
+  };
+
+  const handleCommentIconClick = () => {
+    if (!isAuthenticated) { login(); return; }
+    setShowComments(true);
+    setTimeout(() => commentInputRef.current?.focus(), 100);
+  };
+
   const platform = (product as any)?.platform || "instagram";
-  const shares = (product as any)?.shares || Math.floor(Math.random() * 50);
 
   let platformColor = "bg-zinc-800";
   let platformLabel = "TikTok";
-  if (platform === "instagram") {
-    platformColor = "bg-[#E1306C]";
-    platformLabel = "Instagram";
-  } else if (platform === "facebook") {
-    platformColor = "bg-[#1877F2]";
-    platformLabel = "Facebook";
-  }
+  if (platform === "instagram") { platformColor = "bg-[#E1306C]"; platformLabel = "Instagram"; }
+  else if (platform === "facebook") { platformColor = "bg-[#1877F2]"; platformLabel = "Facebook"; }
 
   return (
     <Drawer open={!!productId} onOpenChange={(open) => !open && onClose()}>
@@ -131,14 +173,14 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
           <DrawerTitle>Product Details</DrawerTitle>
           <DrawerDescription>View product information and purchase</DrawerDescription>
         </DrawerHeader>
-        
+
         {isLoading || !product ? (
           <div className="p-8 flex justify-center items-center h-64">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary" />
           </div>
         ) : (
-          <div className="flex-1 overflow-y-auto no-scrollbar pb-24">
-            {/* Header / Origin Info */}
+          <div className="flex-1 overflow-y-auto no-scrollbar pb-28">
+            {/* Seller header */}
             <div className="flex items-center justify-between p-4 border-b border-border sticky top-0 bg-background/95 backdrop-blur-md z-10">
               <div className="flex items-center gap-3">
                 <img src={product.sellerAvatar} alt={product.sellerUsername} className="w-10 h-10 rounded-full object-cover border border-border" />
@@ -156,49 +198,35 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
             </div>
 
             {/* Image Carousel */}
-            <div className="relative aspect-[4/5] bg-muted w-full overflow-hidden flex snap-x snap-mandatory overflow-x-auto no-scrollbar"
-                 onScroll={(e) => {
-                   const width = e.currentTarget.clientWidth;
-                   const index = Math.round(e.currentTarget.scrollLeft / width);
-                   setActiveImage(index);
-                 }}>
+            <div
+              className="relative aspect-[4/5] bg-muted w-full overflow-hidden flex snap-x snap-mandatory overflow-x-auto no-scrollbar"
+              onScroll={(e) => {
+                const width = e.currentTarget.clientWidth;
+                setActiveImage(Math.round(e.currentTarget.scrollLeft / width));
+              }}
+            >
               {product.images.map((img, i) => (
-                <img 
-                  key={i} 
-                  src={img} 
-                  alt={`${product.title} - ${i + 1}`} 
-                  className="w-full h-full object-cover snap-center shrink-0"
-                />
+                <img key={i} src={img} alt={`${product.title} - ${i + 1}`} className="w-full h-full object-cover snap-center shrink-0" />
               ))}
-              
-              {/* Pagination Dots */}
               {product.images.length > 1 && (
                 <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-10">
                   {product.images.map((_, i) => (
-                    <div 
-                      key={i} 
-                      className={cn(
-                        "w-1.5 h-1.5 rounded-full transition-all",
-                        activeImage === i ? "bg-white w-4" : "bg-white/50"
-                      )}
-                    />
+                    <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all", activeImage === i ? "bg-white w-4" : "bg-white/50")} />
                   ))}
                 </div>
               )}
             </div>
 
-            {/* Title & Price */}
+            {/* Price */}
             <div className="px-5 pt-5 pb-3">
               <div className="flex items-start justify-between gap-4">
                 <h2 className="font-display font-bold text-2xl leading-tight text-foreground">{product.title}</h2>
                 <div className="flex flex-col items-end shrink-0">
                   <span className="font-bold text-2xl text-primary">
-                    {product.currency === 'USD' ? '$' : product.currency}{product.price.toFixed(2)}
+                    {product.currency === "USD" ? "$" : product.currency}{product.price.toFixed(2)}
                   </span>
                   {product.originalPrice && (
-                    <span className="text-sm font-medium text-muted-foreground line-through">
-                      ${product.originalPrice.toFixed(2)}
-                    </span>
+                    <span className="text-sm font-medium text-muted-foreground line-through">${product.originalPrice.toFixed(2)}</span>
                   )}
                 </div>
               </div>
@@ -207,32 +235,35 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
             {/* Action Bar */}
             <div className="flex items-center justify-between px-5 py-3 border-y border-border/50 bg-card/30">
               <div className="flex items-center gap-6">
-                <button 
-                  onClick={() => setIsLiked(!isLiked)}
-                  className="flex flex-col items-center gap-1 group"
-                >
-                  <Heart className={cn("w-6 h-6 transition-transform group-active:scale-75", isLiked ? "fill-destructive text-destructive" : "text-muted-foreground")} />
-                  <span className="text-xs font-semibold text-muted-foreground">{(product.likes + (isLiked ? 1 : 0)).toLocaleString()}</span>
+                {/* Like button — real toggle */}
+                <button onClick={handleLike} disabled={liking} className="flex flex-col items-center gap-1 group">
+                  <Heart className={cn(
+                    "w-6 h-6 transition-all group-active:scale-75",
+                    isLiked ? "fill-red-500 text-red-500 scale-110" : "text-muted-foreground"
+                  )} />
+                  <span className={cn("text-xs font-semibold transition-colors", isLiked ? "text-red-500" : "text-muted-foreground")}>
+                    {likeCount.toLocaleString()}
+                  </span>
                 </button>
-                <button className="flex flex-col items-center gap-1 group">
+
+                {/* Comment button */}
+                <button onClick={handleCommentIconClick} className="flex flex-col items-center gap-1 group">
                   <MessageCircle className="w-6 h-6 text-muted-foreground transition-transform group-active:scale-75" />
-                  <span className="text-xs font-semibold text-muted-foreground">{product.comments}</span>
+                  <span className="text-xs font-semibold text-muted-foreground">{comments?.length ?? product.comments}</span>
                 </button>
+
                 <button className="flex flex-col items-center gap-1 group">
                   <Send className="w-6 h-6 text-muted-foreground transition-transform group-active:scale-75" />
-                  <span className="text-xs font-semibold text-muted-foreground">{shares}</span>
+                  <span className="text-xs font-semibold text-muted-foreground">{product.shares}</span>
                 </button>
               </div>
-              <button 
-                onClick={() => setIsSaved(!isSaved)}
-                className="flex flex-col items-center gap-1 group"
-              >
+              <button onClick={() => setIsSaved(!isSaved)} className="flex flex-col items-center gap-1 group">
                 <Bookmark className={cn("w-6 h-6 transition-transform group-active:scale-75", isSaved ? "fill-foreground text-foreground" : "text-muted-foreground")} />
                 <span className="text-xs font-semibold text-muted-foreground">Save</span>
               </button>
             </div>
 
-            {/* Original Social Post Embed */}
+            {/* Social Post Embed */}
             {(product as any).postUrl && (
               <div>
                 <div className="flex items-center gap-2 px-5 pt-4 pb-1">
@@ -243,39 +274,97 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
               </div>
             )}
 
-            {/* Content Info */}
+            {/* Description + Tags */}
             <div className="px-5 py-4 flex flex-col gap-4">
-              <div className="text-base text-foreground/90 whitespace-pre-wrap leading-relaxed">
-                {product.description}
-              </div>
-
-              {/* Tags */}
+              <div className="text-base text-foreground/90 whitespace-pre-wrap leading-relaxed">{product.description}</div>
               <div className="flex flex-wrap gap-2 mt-2">
-                {product.tags.map(tag => (
-                  <span key={tag} className="text-sm font-medium bg-secondary text-secondary-foreground px-3 py-1 rounded-full">
-                    #{tag}
-                  </span>
+                {product.tags.map((tag) => (
+                  <span key={tag} className="text-sm font-medium bg-secondary text-secondary-foreground px-3 py-1 rounded-full">#{tag}</span>
                 ))}
               </div>
-
               <div className="text-xs font-medium text-muted-foreground uppercase tracking-wider mt-4">
                 Posted {formatDistanceToNow(new Date(product.postedAt), { addSuffix: true })}
               </div>
             </div>
-            
+
+            {/* Comments Section */}
+            <div className="px-5 pb-4">
+              <button
+                onClick={() => setShowComments(!showComments)}
+                className="w-full flex items-center justify-between py-3 border-t border-border/50"
+              >
+                <span className="font-semibold text-sm">
+                  Comments {comments?.length ? `(${comments.length})` : ""}
+                </span>
+                <ChevronRight className={cn("w-4 h-4 text-muted-foreground transition-transform", showComments ? "rotate-90" : "")} />
+              </button>
+
+              {showComments && (
+                <div className="space-y-3 mt-2">
+                  {/* Comment input */}
+                  <div className="flex items-center gap-2">
+                    <input
+                      ref={commentInputRef}
+                      type="text"
+                      value={commentText}
+                      onChange={(e) => setCommentText(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === "Enter") handleComment(); }}
+                      placeholder={isAuthenticated ? "Add a comment..." : "Sign in to comment"}
+                      disabled={!isAuthenticated || commenting}
+                      className="flex-1 bg-muted/60 border border-border rounded-full px-4 py-2 text-sm outline-none focus:ring-2 focus:ring-primary/20 focus:border-primary/40 transition-all disabled:opacity-50"
+                    />
+                    <button
+                      onClick={handleComment}
+                      disabled={!commentText.trim() || commenting || !isAuthenticated}
+                      className="w-9 h-9 rounded-full bg-primary text-white flex items-center justify-center disabled:opacity-40 active:scale-90 transition-all"
+                    >
+                      {commenting ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                    </button>
+                  </div>
+
+                  {/* Comment list */}
+                  {!comments?.length ? (
+                    <p className="text-sm text-muted-foreground text-center py-6">No comments yet — be the first!</p>
+                  ) : (
+                    comments.map((c) => (
+                      <div key={c.id} className="flex gap-2.5">
+                        <div className="w-8 h-8 rounded-full bg-muted shrink-0 overflow-hidden">
+                          {c.avatar ? (
+                            <img src={c.avatar} alt={c.username} className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="w-full h-full bg-primary/20 flex items-center justify-center text-primary text-xs font-bold">
+                              {c.username[0]?.toUpperCase()}
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex-1 bg-muted/50 rounded-2xl rounded-tl-sm px-3 py-2">
+                          <p className="text-xs font-bold text-foreground leading-tight">{c.username}</p>
+                          <p className="text-sm text-foreground/90 mt-0.5 leading-snug">{c.text}</p>
+                          <p className="text-[10px] text-muted-foreground mt-1">
+                            {formatDistanceToNow(new Date(c.createdAt), { addSuffix: true })}
+                          </p>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* More from seller */}
             <div className="px-5 pt-2 pb-6">
-               <button className="w-full bg-secondary/50 hover:bg-secondary border border-border rounded-xl p-4 flex items-center justify-between transition-colors">
-                 <div className="flex items-center gap-3">
-                   <div className="bg-background p-2 rounded-lg shadow-sm border border-border">
-                     <Store className="w-5 h-5 text-primary" />
-                   </div>
-                   <div className="flex flex-col items-start">
-                     <span className="font-semibold text-sm">More from this seller</span>
-                     <span className="text-xs text-muted-foreground">View all items</span>
-                   </div>
-                 </div>
-                 <ChevronRight className="w-5 h-5 text-muted-foreground" />
-               </button>
+              <button className="w-full bg-secondary/50 hover:bg-secondary border border-border rounded-xl p-4 flex items-center justify-between transition-colors">
+                <div className="flex items-center gap-3">
+                  <div className="bg-background p-2 rounded-lg shadow-sm border border-border">
+                    <Store className="w-5 h-5 text-primary" />
+                  </div>
+                  <div className="flex flex-col items-start">
+                    <span className="font-semibold text-sm">More from this seller</span>
+                    <span className="text-xs text-muted-foreground">View all items</span>
+                  </div>
+                </div>
+                <ChevronRight className="w-5 h-5 text-muted-foreground" />
+              </button>
             </div>
           </div>
         )}
@@ -283,13 +372,13 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
         {/* Sticky Buy Button */}
         {product && (
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur-lg border-t border-border z-20">
-            <button 
+            <button
               onClick={handleAddToCart}
               disabled={product.isSoldOut || addingToCart}
               className={cn(
                 "w-full flex items-center justify-center gap-2 py-4 rounded-full font-bold text-base shadow-lg transition-all active:scale-[0.98]",
-                product.isSoldOut 
-                  ? "bg-muted text-muted-foreground shadow-none cursor-not-allowed" 
+                product.isSoldOut
+                  ? "bg-muted text-muted-foreground shadow-none cursor-not-allowed"
                   : "bg-primary text-primary-foreground hover:bg-primary/90 shadow-primary/25"
               )}
             >

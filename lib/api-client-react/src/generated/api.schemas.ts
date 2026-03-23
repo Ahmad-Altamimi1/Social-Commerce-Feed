@@ -86,6 +86,7 @@ export interface Product {
   platform: string;
   /** URL of the original social media post to embed */
   postUrl?: string;
+  isLikedByMe?: boolean;
   postedAt: string;
   sellerUsername: string;
   sellerAvatar: string;
@@ -115,6 +116,7 @@ export interface FeedProduct {
   platform: string;
   /** URL of the original social media post to embed */
   postUrl?: string;
+  isLikedByMe?: boolean;
   postedAt: string;
   sellerUsername: string;
   sellerAvatar: string;
@@ -239,6 +241,24 @@ export const UpdateOrderStatusBodyStatus = {
 
 export interface UpdateOrderStatusBody {
   status: UpdateOrderStatusBodyStatus;
+}
+
+export interface LikeResponse {
+  liked: boolean;
+  likeCount: number;
+}
+
+export interface Comment {
+  id: number;
+  userId: string;
+  username: string;
+  avatar?: string;
+  text: string;
+  createdAt: string;
+}
+
+export interface AddCommentBody {
+  text: string;
 }
 
 export type GetFeedParams = {

@@ -407,6 +407,73 @@ paths:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
 
+  /products/{id}/like:
+    post:
+      operationId: toggleProductLike
+      tags: [products]
+      summary: Toggle like on a product (requires auth)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Like toggled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LikeResponse"
+        "401":
+          description: Unauthorized
+
+  /products/{id}/comments:
+    get:
+      operationId: listProductComments
+      tags: [products]
+      summary: List comments for a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Comment list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Comment"
+    post:
+      operationId: addProductComment
+      tags: [products]
+      summary: Add a comment to a product (requires auth)
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddCommentBody"
+      responses:
+        "201":
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Comment"
+        "401":
+          description: Unauthorized
+
   /categories:
     get:
       operationId: listCategories
@@ -821,6 +888,8 @@ components:
         postUrl:
           type: string
           description: "URL of the original social media post to embed"
+        isLikedByMe:
+          type: boolean
         postedAt:
           type: string
         sellerUsername:
@@ -899,6 +968,8 @@ components:
         postUrl:
           type: string
           description: "URL of the original social media post to embed"
+        isLikedByMe:
+          type: boolean
         postedAt:
           type: string
         sellerUsername:
@@ -1201,3 +1272,44 @@ components:
           enum: [pending, confirmed, shipped, delivered, cancelled]
       required:
         - status
+
+    LikeResponse:
+      type: object
+      properties:
+        liked:
+          type: boolean
+        likeCount:
+          type: integer
+      required:
+        - liked
+        - likeCount
+
+    Comment:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        username:
+          type: string
+        avatar:
+          type: string
+        text:
+          type: string
+        createdAt:
+          type: string
+      required:
+        - id
+        - userId
+        - username
+        - text
+        - createdAt
+
+    AddCommentBody:
+      type: object
+      properties:
+        text:
+          type: string
+      required:
+        - text

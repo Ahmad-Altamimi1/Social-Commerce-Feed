@@ -6,11 +6,13 @@
  * OpenAPI spec version: 0.2.0
  */
 
+export * from "./addCommentBody";
 export * from "./addToCartBody";
 export * from "./authUser";
 export * from "./cart";
 export * from "./cartItem";
 export * from "./category";
+export * from "./comment";
 export * from "./createOrderBody";
 export * from "./createProductBody";
 export * from "./errorResponse";
@@ -20,6 +22,7 @@ export * from "./getFeedParams";
 export * from "./getMerchantProductsParams";
 export * from "./healthStatus";
 export * from "./highlight";
+export * from "./likeResponse";
 export * from "./listProductsParams";
 export * from "./merchant";
 export * from "./merchantCartGroup";

@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
-import { merchantsTable, productsTable } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { merchantsTable, productsTable, productLikesTable } from "@workspace/db";
+import { eq, and, inArray } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -26,8 +26,17 @@ router.get("/feed", async (req, res) => {
   if (category && category !== "all") filtered = filtered.filter((p) => p.category === category);
 
   filtered = filtered.sort((a, b) => b.postedAt.getTime() - a.postedAt.getTime());
-
   const paginated = filtered.slice(offset, offset + limit);
+
+  const userId = req.isAuthenticated() ? req.user.id : undefined;
+  let likedSet = new Set<number>();
+  if (userId && paginated.length > 0) {
+    const productIds = paginated.map((p) => p.id);
+    const likes = await db.select({ productId: productLikesTable.productId })
+      .from(productLikesTable)
+      .where(and(eq(productLikesTable.userId, userId), inArray(productLikesTable.productId, productIds)));
+    likedSet = new Set(likes.map((l) => l.productId));
+  }
 
   res.json(
     paginated.map((p) => {
@@ -55,6 +64,7 @@ router.get("/feed", async (req, res) => {
         badge: p.badge,
         platform: p.platform,
         postUrl: p.postUrl ?? undefined,
+        isLikedByMe: likedSet.has(p.id),
         postedAt: p.postedAt.toISOString(),
         sellerUsername: p.sellerUsername,
         sellerAvatar: p.sellerAvatar,

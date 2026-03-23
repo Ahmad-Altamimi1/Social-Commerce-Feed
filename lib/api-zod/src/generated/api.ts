@@ -66,6 +66,7 @@ export const GetFeedResponseItem = zod.object({
     .string()
     .optional()
     .describe("URL of the original social media post to embed"),
+  isLikedByMe: zod.boolean().optional(),
   postedAt: zod.string(),
   sellerUsername: zod.string(),
   sellerAvatar: zod.string(),
@@ -182,6 +183,7 @@ export const GetMerchantProductsResponseItem = zod.object({
     .string()
     .optional()
     .describe("URL of the original social media post to embed"),
+  isLikedByMe: zod.boolean().optional(),
   postedAt: zod.string(),
   sellerUsername: zod.string(),
   sellerAvatar: zod.string(),
@@ -283,6 +285,7 @@ export const ListMyProductsResponseItem = zod.object({
     .string()
     .optional()
     .describe("URL of the original social media post to embed"),
+  isLikedByMe: zod.boolean().optional(),
   postedAt: zod.string(),
   sellerUsername: zod.string(),
   sellerAvatar: zod.string(),
@@ -359,6 +362,7 @@ export const UpdateProductResponse = zod.object({
     .string()
     .optional()
     .describe("URL of the original social media post to embed"),
+  isLikedByMe: zod.boolean().optional(),
   postedAt: zod.string(),
   sellerUsername: zod.string(),
   sellerAvatar: zod.string(),
@@ -473,9 +477,52 @@ export const GetProductResponse = zod.object({
     .string()
     .optional()
     .describe("URL of the original social media post to embed"),
+  isLikedByMe: zod.boolean().optional(),
   postedAt: zod.string(),
   sellerUsername: zod.string(),
   sellerAvatar: zod.string(),
+});
+
+/**
+ * @summary Toggle like on a product (requires auth)
+ */
+export const ToggleProductLikeParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ToggleProductLikeResponse = zod.object({
+  liked: zod.boolean(),
+  likeCount: zod.number(),
+});
+
+/**
+ * @summary List comments for a product
+ */
+export const ListProductCommentsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const ListProductCommentsResponseItem = zod.object({
+  id: zod.number(),
+  userId: zod.string(),
+  username: zod.string(),
+  avatar: zod.string().optional(),
+  text: zod.string(),
+  createdAt: zod.string(),
+});
+export const ListProductCommentsResponse = zod.array(
+  ListProductCommentsResponseItem,
+);
+
+/**
+ * @summary Add a comment to a product (requires auth)
+ */
+export const AddProductCommentParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const AddProductCommentBody = zod.object({
+  text: zod.string(),
 });
 
 /**
@@ -557,6 +604,7 @@ export const GetCartResponse = zod.object({
               .string()
               .optional()
               .describe("URL of the original social media post to embed"),
+            isLikedByMe: zod.boolean().optional(),
             postedAt: zod.string(),
             sellerUsername: zod.string(),
             sellerAvatar: zod.string(),
@@ -642,6 +690,7 @@ export const AddToCartResponse = zod.object({
               .string()
               .optional()
               .describe("URL of the original social media post to embed"),
+            isLikedByMe: zod.boolean().optional(),
             postedAt: zod.string(),
             sellerUsername: zod.string(),
             sellerAvatar: zod.string(),
@@ -730,6 +779,7 @@ export const UpdateCartItemResponse = zod.object({
               .string()
               .optional()
               .describe("URL of the original social media post to embed"),
+            isLikedByMe: zod.boolean().optional(),
             postedAt: zod.string(),
             sellerUsername: zod.string(),
             sellerAvatar: zod.string(),
@@ -814,6 +864,7 @@ export const RemoveFromCartResponse = zod.object({
               .string()
               .optional()
               .describe("URL of the original social media post to embed"),
+            isLikedByMe: zod.boolean().optional(),
             postedAt: zod.string(),
             sellerUsername: zod.string(),
             sellerAvatar: zod.string(),
@@ -946,6 +997,7 @@ export const ListProductsResponseItem = zod.object({
     .string()
     .optional()
     .describe("URL of the original social media post to embed"),
+  isLikedByMe: zod.boolean().optional(),
   postedAt: zod.string(),
   sellerUsername: zod.string(),
   sellerAvatar: zod.string(),
