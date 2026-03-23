@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db } from "@workspace/db";
 import { merchantsTable, productsTable, categoriesTable, highlightsTable, productLikesTable } from "@workspace/db";
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -16,6 +16,7 @@ async function formatProduct(r: typeof productsTable.$inferSelect, userId?: stri
   return {
     id: r.id,
     merchantId: r.merchantId,
+    slug: r.slug,
     title: r.title,
     description: r.description,
     price: r.price,
@@ -37,6 +38,20 @@ async function formatProduct(r: typeof productsTable.$inferSelect, userId?: stri
     sellerUsername: r.sellerUsername,
     sellerAvatar: r.sellerAvatar,
   };
+}
+
+function titleToSlug(title: string, id: number, existingSlugs: Set<string>): string {
+  let base = title
+    .toLowerCase()
+    .replace(/[^a-z0-9\s-]/g, "")
+    .trim()
+    .replace(/\s+/g, "-")
+    .replace(/-+/g, "-");
+  let slug = base;
+  if (existingSlugs.has(slug)) {
+    slug = `${base}-${id}`;
+  }
+  return slug;
 }
 
 router.get("/store", async (_req, res) => {
@@ -76,6 +91,25 @@ router.get("/products", async (req, res) => {
   if (platform) rows = rows.filter((r) => r.platform === platform);
   const userId = req.isAuthenticated() ? req.user.id : undefined;
   res.json(await Promise.all(rows.map((r) => formatProduct(r, userId))));
+});
+
+router.get("/products/by-slug/:slug", async (req, res) => {
+  const { slug } = req.params;
+  const rows = await db.select().from(productsTable).where(eq(productsTable.slug, slug));
+  const r = rows[0];
+  if (!r) { res.status(404).json({ error: "Product not found" }); return; }
+  const userId = req.isAuthenticated() ? req.user.id : undefined;
+  res.json(await formatProduct(r, userId));
+});
+
+router.post("/products/:id/share", async (req, res) => {
+  const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) { res.status(400).json({ error: "Invalid product id" }); return; }
+  await db.update(productsTable)
+    .set({ shares: sql`${productsTable.shares} + 1` })
+    .where(eq(productsTable.id, id));
+  const [updated] = await db.select({ shares: productsTable.shares }).from(productsTable).where(eq(productsTable.id, id));
+  res.json({ shareCount: updated?.shares ?? 0 });
 });
 
 router.get("/products/:id", async (req, res) => {

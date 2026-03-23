@@ -11,6 +11,7 @@ import CartPage from "@/pages/CartPage";
 import CheckoutPage from "@/pages/CheckoutPage";
 import DashboardPage from "@/pages/DashboardPage";
 import ProfilePage from "@/pages/ProfilePage";
+import ProductPage from "@/pages/ProductPage";
 import NotFound from "@/pages/not-found";
 
 const queryClient = new QueryClient({
@@ -33,6 +34,7 @@ function Router() {
       <Route path="/checkout" component={CheckoutPage} />
       <Route path="/dashboard" component={DashboardPage} />
       <Route path="/profile" component={ProfilePage} />
+      <Route path="/product/:slug" component={ProductPage} />
       <Route component={NotFound} />
     </Switch>
   );

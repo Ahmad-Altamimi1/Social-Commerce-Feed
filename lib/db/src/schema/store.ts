@@ -42,6 +42,7 @@ export const categoriesTable = pgTable("categories", {
 export const productsTable = pgTable("products", {
   id: serial("id").primaryKey(),
   merchantId: integer("merchant_id").notNull().references(() => merchantsTable.id),
+  slug: text("slug").notNull().default(""),
   title: text("title").notNull(),
   description: text("description").notNull(),
   price: real("price").notNull(),

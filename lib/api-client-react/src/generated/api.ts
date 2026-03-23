@@ -38,6 +38,7 @@ import type {
   Order,
   Product,
   RegisterMerchantBody,
+  ShareResponse,
   UpdateCartItemBody,
   UpdateOrderStatusBody,
 } from "./api.schemas";
@@ -2522,4 +2523,156 @@ export function useListProducts<
   };
 
   return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Get product by slug
+ */
+export const getGetProductBySlugUrl = (slug: string) => {
+  return `/api/products/by-slug/${slug}`;
+};
+
+export const getProductBySlug = async (
+  slug: string,
+  options?: RequestInit,
+): Promise<Product> => {
+  return customFetch<Product>(getGetProductBySlugUrl(slug), {
+    ...options,
+    method: "GET",
+  });
+};
+
+export const getGetProductBySlugQueryKey = (slug: string) => {
+  return [`/api/products/by-slug/${slug}`] as const;
+};
+
+export const getGetProductBySlugQueryOptions = <
+  TData = Awaited<ReturnType<typeof getProductBySlug>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  slug: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProductBySlug>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
+  const { query: queryOptions, request: requestOptions } = options ?? {};
+  const queryKey = queryOptions?.queryKey ?? getGetProductBySlugQueryKey(slug);
+  const queryFn: QueryFunction<Awaited<ReturnType<typeof getProductBySlug>>> = ({
+    signal,
+  }) => getProductBySlug(slug, { signal, ...requestOptions });
+  return { queryKey, queryFn, enabled: !!slug, ...queryOptions } as UseQueryOptions<
+    Awaited<ReturnType<typeof getProductBySlug>>,
+    TError,
+    TData
+  >;
+};
+
+export type GetProductBySlugQueryResult = NonNullable<
+  Awaited<ReturnType<typeof getProductBySlug>>
+>;
+export type GetProductBySlugQueryError = ErrorType<ErrorResponse>;
+
+export function useGetProductBySlug<
+  TData = Awaited<ReturnType<typeof getProductBySlug>>,
+  TError = ErrorType<ErrorResponse>,
+>(
+  slug: string,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getProductBySlug>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetProductBySlugQueryOptions(slug, options);
+  const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
+    queryKey: QueryKey;
+  };
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+/**
+ * @summary Share a product (increment share count)
+ */
+export const getShareProductUrl = (id: number) => {
+  return `/api/products/${id}/share`;
+};
+
+export const shareProduct = async (
+  id: number,
+  options?: RequestInit,
+): Promise<ShareResponse> => {
+  return customFetch<ShareResponse>(getShareProductUrl(id), {
+    ...options,
+    method: "POST",
+  });
+};
+
+export const getShareProductMutationOptions = <
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof shareProduct>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof shareProduct>>,
+  TError,
+  { id: number },
+  TContext
+> => {
+  const mutationKey = ["shareProduct"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof shareProduct>>,
+    { id: number }
+  > = (props) => {
+    const { id } = props ?? {};
+    return shareProduct(id, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type ShareProductMutationResult = NonNullable<
+  Awaited<ReturnType<typeof shareProduct>>
+>;
+export type ShareProductMutationError = ErrorType<void>;
+
+export function useShareProduct<
+  TError = ErrorType<void>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof shareProduct>>,
+    TError,
+    { id: number },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof shareProduct>>,
+  TError,
+  { id: number },
+  TContext
+> {
+  return useMutation(getShareProductMutationOptions(options));
 }

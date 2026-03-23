@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerHeader } from "@/components/ui/drawer";
 import {
   useGetProduct, useAddToCart, useToggleProductLike,
-  useListProductComments, useAddProductComment,
+  useListProductComments, useAddProductComment, useShareProduct,
   getGetProductQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
@@ -11,6 +11,7 @@ import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { ImageSlider } from "@/components/product/ImageSlider";
 
 function isSupportedOembedPlatform(platform: string): boolean {
   return platform === "instagram" || platform === "tiktok";
@@ -121,12 +122,13 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
     query: { enabled: !!productId }
   });
   const { mutateAsync: postComment, isPending: commenting } = useAddProductComment();
+  const { mutateAsync: shareProductMutation } = useShareProduct();
 
   // null = "not overridden" → read from server data; boolean = optimistic override
   const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
   const [optimisticCount, setOptimisticCount] = useState<number | null>(null);
+  const [shareCount, setShareCount] = useState(0);
   const [isSaved, setIsSaved] = useState(false);
-  const [activeImage, setActiveImage] = useState(0);
   const [showComments, setShowComments] = useState(false);
   const [commentText, setCommentText] = useState("");
   const commentInputRef = useRef<HTMLInputElement>(null);
@@ -137,8 +139,8 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
   useEffect(() => {
     setOptimisticLiked(null);
     setOptimisticCount(null);
+    if (product) setShareCount((product as any).shares ?? 0);
     setIsSaved(false);
-    setActiveImage(0);
     setShowComments(false);
     setCommentText("");
   }, [product?.id]);
@@ -197,6 +199,34 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
     }
   };
 
+  const handleShare = async () => {
+    if (!product) return;
+    const slug = (product as any).slug || product.id.toString();
+    const productUrl = `${window.location.origin}${import.meta.env.BASE_URL}product/${slug}`;
+    let shared = false;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: product.title, url: productUrl });
+        shared = true;
+      } catch {}
+    }
+    if (!shared) {
+      try {
+        await navigator.clipboard.writeText(productUrl);
+        toast({ title: "Link copied!", description: "Product link copied to clipboard" });
+        shared = true;
+      } catch {
+        toast({ title: "Could not share", variant: "destructive" });
+      }
+    }
+    if (shared) {
+      try {
+        const result = await shareProductMutation({ id: product.id });
+        setShareCount(result.shareCount);
+      } catch {}
+    }
+  };
+
   const openComments = (focusInput = false) => {
     setShowComments(true);
     setTimeout(() => {
@@ -251,25 +281,8 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
               </button>
             </div>
 
-            {/* Image Carousel */}
-            <div
-              className="relative aspect-[4/5] bg-muted w-full overflow-hidden flex snap-x snap-mandatory overflow-x-auto no-scrollbar"
-              onScroll={(e) => {
-                const width = e.currentTarget.clientWidth;
-                setActiveImage(Math.round(e.currentTarget.scrollLeft / width));
-              }}
-            >
-              {product.images.map((img, i) => (
-                <img key={i} src={img} alt={`${product.title} - ${i + 1}`} className="w-full h-full object-cover snap-center shrink-0" />
-              ))}
-              {product.images.length > 1 && (
-                <div className="absolute bottom-4 left-0 right-0 flex justify-center gap-1.5 z-10">
-                  {product.images.map((_, i) => (
-                    <div key={i} className={cn("w-1.5 h-1.5 rounded-full transition-all", activeImage === i ? "bg-white w-4" : "bg-white/50")} />
-                  ))}
-                </div>
-              )}
-            </div>
+            {/* Image Slider */}
+            <ImageSlider images={product.images} alt={product.title} />
 
             {/* Price */}
             <div className="px-5 pt-5 pb-3">
@@ -306,9 +319,9 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
                   <span className={cn("text-xs font-semibold", showComments ? "text-primary" : "text-muted-foreground")}>{comments?.length ?? product.comments}</span>
                 </button>
 
-                <button className="flex flex-col items-center gap-1 group">
+                <button onClick={handleShare} className="flex flex-col items-center gap-1 group">
                   <Send className="w-6 h-6 text-muted-foreground transition-transform group-active:scale-75" />
-                  <span className="text-xs font-semibold text-muted-foreground">{product.shares}</span>
+                  <span className="text-xs font-semibold text-muted-foreground">{shareCount}</span>
                 </button>
               </div>
               <button onClick={() => setIsSaved(!isSaved)} className="flex flex-col items-center gap-1 group">

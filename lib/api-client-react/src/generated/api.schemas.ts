@@ -68,6 +68,7 @@ export interface RegisterMerchantBody {
 export interface Product {
   id: number;
   merchantId: number;
+  slug: string;
   title: string;
   description: string;
   price: number;
@@ -90,6 +91,10 @@ export interface Product {
   postedAt: string;
   sellerUsername: string;
   sellerAvatar: string;
+}
+
+export interface ShareResponse {
+  shareCount: number;
 }
 
 export interface FeedProduct {
