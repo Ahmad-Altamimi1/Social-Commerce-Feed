@@ -1,20 +1,29 @@
 openapi: 3.1.0
 info:
   title: Api
-  version: 0.1.0
-  description: Social Commerce Store API
+  version: 0.2.0
+  description: Multi-Merchant Social Commerce Store API
 servers:
   - url: /api
     description: Base API path
 tags:
   - name: health
     description: Health operations
-  - name: store
-    description: Store operations
+  - name: auth
+    description: Authentication
+  - name: feed
+    description: Home feed
+  - name: merchants
+    description: Merchant operations
   - name: products
     description: Product operations
   - name: categories
     description: Category operations
+  - name: cart
+    description: Shopping cart
+  - name: orders
+    description: Order management
+
 paths:
   /healthz:
     get:
@@ -29,35 +38,106 @@ paths:
               schema:
                 $ref: "#/components/schemas/HealthStatus"
 
-  /store:
+  /auth/user:
     get:
-      operationId: getStore
-      tags: [store]
-      summary: Get store profile
+      operationId: getCurrentAuthUser
+      tags: [auth]
+      summary: Get current authenticated user
       responses:
         "200":
-          description: Store profile
+          description: Current user info
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/StoreProfile"
+                $ref: "#/components/schemas/GetCurrentAuthUserResponse"
 
-  /products:
+  /feed:
     get:
-      operationId: listProducts
-      tags: [products]
-      summary: List all products
+      operationId: getFeed
+      tags: [feed]
+      summary: Get global product feed across all merchants
       parameters:
+        - name: platform
+          in: query
+          required: false
+          schema:
+            type: string
         - name: category
           in: query
           required: false
           schema:
             type: string
-        - name: featured
+        - name: limit
           in: query
           required: false
           schema:
-            type: boolean
+            type: integer
+        - name: offset
+          in: query
+          required: false
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Feed items
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/FeedProduct"
+
+  /merchants:
+    get:
+      operationId: listMerchants
+      tags: [merchants]
+      summary: List all merchants
+      responses:
+        "200":
+          description: Merchant list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Merchant"
+
+  /merchants/{username}:
+    get:
+      operationId: getMerchant
+      tags: [merchants]
+      summary: Get merchant by username
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Merchant profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Merchant"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /merchants/{username}/products:
+    get:
+      operationId: getMerchantProducts
+      tags: [merchants]
+      summary: Get products for a specific merchant
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
         - name: platform
           in: query
           required: false
@@ -72,6 +152,235 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Product"
+
+  /merchants/{username}/highlights:
+    get:
+      operationId: getMerchantHighlights
+      tags: [merchants]
+      summary: Get highlights/collections for a specific merchant
+      parameters:
+        - name: username
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Highlights list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Highlight"
+
+  /merchant/me:
+    get:
+      operationId: getMyMerchantProfile
+      tags: [merchants]
+      summary: Get my merchant profile (authenticated)
+      responses:
+        "200":
+          description: My merchant profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Merchant"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: No merchant profile yet
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /merchant/register:
+    post:
+      operationId: registerMerchant
+      tags: [merchants]
+      summary: Register as a merchant
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/RegisterMerchantBody"
+      responses:
+        "201":
+          description: Merchant created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Merchant"
+        "400":
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /merchant/products:
+    get:
+      operationId: listMyProducts
+      tags: [merchants]
+      summary: List my products (authenticated merchant)
+      responses:
+        "200":
+          description: My product list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: createProduct
+      tags: [merchants]
+      summary: Create a product (authenticated merchant)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductBody"
+      responses:
+        "201":
+          description: Product created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /merchant/products/{id}:
+    put:
+      operationId: updateProduct
+      tags: [merchants]
+      summary: Update a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateProductBody"
+      responses:
+        "200":
+          description: Product updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Product"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "404":
+          description: Not found
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: deleteProduct
+      tags: [merchants]
+      summary: Delete a product
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "204":
+          description: Deleted
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /merchant/orders:
+    get:
+      operationId: getMerchantOrders
+      tags: [merchants]
+      summary: Get orders for my merchant (authenticated)
+      responses:
+        "200":
+          description: Order list for merchant
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/MerchantOrder"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /merchant/orders/{id}/status:
+    patch:
+      operationId: updateOrderStatus
+      tags: [merchants]
+      summary: Update order status
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateOrderStatusBody"
+      responses:
+        "200":
+          description: Status updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MerchantOrder"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
 
   /products/{id}:
     get:
@@ -113,11 +422,183 @@ paths:
                 items:
                   $ref: "#/components/schemas/Category"
 
+  /cart:
+    get:
+      operationId: getCart
+      tags: [cart]
+      summary: Get current user's cart
+      responses:
+        "200":
+          description: Cart with items grouped by merchant
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: addToCart
+      tags: [cart]
+      summary: Add item to cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AddToCartBody"
+      responses:
+        "200":
+          description: Cart updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: clearCart
+      tags: [cart]
+      summary: Clear the cart
+      responses:
+        "204":
+          description: Cart cleared
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /cart/{itemId}:
+    put:
+      operationId: updateCartItem
+      tags: [cart]
+      summary: Update cart item quantity
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateCartItemBody"
+      responses:
+        "200":
+          description: Cart updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    delete:
+      operationId: removeFromCart
+      tags: [cart]
+      summary: Remove item from cart
+      parameters:
+        - name: itemId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Cart updated
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Cart"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /orders:
+    get:
+      operationId: listOrders
+      tags: [orders]
+      summary: Get current user's order history
+      responses:
+        "200":
+          description: Order list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Order"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+    post:
+      operationId: createOrder
+      tags: [orders]
+      summary: Checkout — create order from cart
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateOrderBody"
+      responses:
+        "201":
+          description: Order created
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Order"
+        "400":
+          description: Cart is empty or validation error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          description: Unauthorized
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ErrorResponse"
+
+  /store:
+    get:
+      operationId: getStore
+      tags: [merchants]
+      summary: Get default store profile (legacy)
+      responses:
+        "200":
+          description: Store profile
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Merchant"
+
   /highlights:
     get:
       operationId: listHighlights
-      tags: [store]
-      summary: List collections (formerly highlights)
+      tags: [merchants]
+      summary: List all collections (legacy)
       responses:
         "200":
           description: Collections list
@@ -127,6 +608,37 @@ paths:
                 type: array
                 items:
                   $ref: "#/components/schemas/Highlight"
+
+  /products:
+    get:
+      operationId: listProducts
+      tags: [products]
+      summary: List all products (legacy)
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: featured
+          in: query
+          required: false
+          schema:
+            type: boolean
+        - name: platform
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Product list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Product"
 
 components:
   schemas:
@@ -146,6 +658,32 @@ components:
       required:
         - error
 
+    AuthUser:
+      type: object
+      properties:
+        id:
+          type: string
+        email:
+          type: string
+        firstName:
+          type: string
+        lastName:
+          type: string
+        profileImageUrl:
+          type: string
+      required:
+        - id
+
+    GetCurrentAuthUserResponse:
+      type: object
+      properties:
+        user:
+          $ref: "#/components/schemas/AuthUser"
+        isAuthenticated:
+          type: boolean
+      required:
+        - isAuthenticated
+
     SocialLink:
       type: object
       properties:
@@ -163,11 +701,13 @@ components:
         - url
         - handle
 
-    StoreProfile:
+    Merchant:
       type: object
       properties:
         id:
           type: integer
+        userId:
+          type: string
         username:
           type: string
         displayName:
@@ -204,6 +744,7 @@ components:
           type: string
       required:
         - id
+        - userId
         - username
         - displayName
         - bio
@@ -213,10 +754,34 @@ components:
         - isVerified
         - socialLinks
 
+    RegisterMerchantBody:
+      type: object
+      properties:
+        username:
+          type: string
+        displayName:
+          type: string
+        tagline:
+          type: string
+        bio:
+          type: string
+        category:
+          type: string
+        location:
+          type: string
+        website:
+          type: string
+      required:
+        - username
+        - displayName
+        - bio
+
     Product:
       type: object
       properties:
         id:
+          type: integer
+        merchantId:
           type: integer
         title:
           type: string
@@ -244,8 +809,6 @@ components:
           type: integer
         shares:
           type: integer
-        isLiked:
-          type: boolean
         isFeatured:
           type: boolean
         isSoldOut:
@@ -255,6 +818,9 @@ components:
         platform:
           type: string
           description: "Source platform: instagram, facebook, tiktok"
+        postUrl:
+          type: string
+          description: "URL of the original social media post to embed"
         postedAt:
           type: string
         sellerUsername:
@@ -263,6 +829,7 @@ components:
           type: string
       required:
         - id
+        - merchantId
         - title
         - description
         - price
@@ -273,13 +840,135 @@ components:
         - likes
         - comments
         - shares
-        - isLiked
         - isFeatured
         - isSoldOut
         - platform
         - postedAt
         - sellerUsername
         - sellerAvatar
+
+    FeedProduct:
+      type: object
+      properties:
+        id:
+          type: integer
+        merchantId:
+          type: integer
+        merchantUsername:
+          type: string
+        merchantDisplayName:
+          type: string
+        merchantAvatar:
+          type: string
+        merchantIsVerified:
+          type: boolean
+        title:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        originalPrice:
+          type: number
+        currency:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        likes:
+          type: integer
+        comments:
+          type: integer
+        shares:
+          type: integer
+        isFeatured:
+          type: boolean
+        isSoldOut:
+          type: boolean
+        badge:
+          type: string
+        platform:
+          type: string
+        postUrl:
+          type: string
+          description: "URL of the original social media post to embed"
+        postedAt:
+          type: string
+        sellerUsername:
+          type: string
+        sellerAvatar:
+          type: string
+      required:
+        - id
+        - merchantId
+        - merchantUsername
+        - merchantDisplayName
+        - merchantAvatar
+        - merchantIsVerified
+        - title
+        - description
+        - price
+        - currency
+        - images
+        - category
+        - tags
+        - likes
+        - comments
+        - shares
+        - isFeatured
+        - isSoldOut
+        - platform
+        - postedAt
+        - sellerUsername
+        - sellerAvatar
+
+    CreateProductBody:
+      type: object
+      properties:
+        title:
+          type: string
+        description:
+          type: string
+        price:
+          type: number
+        originalPrice:
+          type: number
+        currency:
+          type: string
+        images:
+          type: array
+          items:
+            type: string
+        category:
+          type: string
+        tags:
+          type: array
+          items:
+            type: string
+        isFeatured:
+          type: boolean
+        badge:
+          type: string
+        platform:
+          type: string
+        postUrl:
+          type: string
+          description: "URL of the original social media post to embed"
+      required:
+        - title
+        - description
+        - price
+        - images
+        - category
+        - tags
+        - platform
 
     Category:
       type: object
@@ -320,3 +1009,195 @@ components:
         - coverImage
         - category
         - productCount
+
+    CartItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        merchantId:
+          type: integer
+        quantity:
+          type: integer
+        product:
+          $ref: "#/components/schemas/Product"
+      required:
+        - id
+        - productId
+        - merchantId
+        - quantity
+        - product
+
+    MerchantCartGroup:
+      type: object
+      properties:
+        merchant:
+          $ref: "#/components/schemas/Merchant"
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/CartItem"
+        subtotal:
+          type: number
+      required:
+        - merchant
+        - items
+        - subtotal
+
+    Cart:
+      type: object
+      properties:
+        groups:
+          type: array
+          items:
+            $ref: "#/components/schemas/MerchantCartGroup"
+        totalItems:
+          type: integer
+        total:
+          type: number
+      required:
+        - groups
+        - totalItems
+        - total
+
+    AddToCartBody:
+      type: object
+      properties:
+        productId:
+          type: integer
+        quantity:
+          type: integer
+      required:
+        - productId
+
+    UpdateCartItemBody:
+      type: object
+      properties:
+        quantity:
+          type: integer
+      required:
+        - quantity
+
+    CreateOrderBody:
+      type: object
+      properties:
+        customerName:
+          type: string
+        customerNotes:
+          type: string
+        address:
+          type: string
+        locationLat:
+          type: number
+        locationLng:
+          type: number
+      required:
+        - customerName
+        - address
+
+    Order:
+      type: object
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+        customerName:
+          type: string
+        customerNotes:
+          type: string
+        address:
+          type: string
+        locationLat:
+          type: number
+        locationLng:
+          type: number
+        total:
+          type: number
+        createdAt:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+      required:
+        - id
+        - status
+        - customerName
+        - address
+        - total
+        - createdAt
+        - items
+
+    OrderItem:
+      type: object
+      properties:
+        id:
+          type: integer
+        productId:
+          type: integer
+        merchantId:
+          type: integer
+        merchantUsername:
+          type: string
+        quantity:
+          type: integer
+        price:
+          type: number
+        title:
+          type: string
+        image:
+          type: string
+      required:
+        - id
+        - productId
+        - merchantId
+        - merchantUsername
+        - quantity
+        - price
+        - title
+
+    MerchantOrder:
+      type: object
+      properties:
+        id:
+          type: integer
+        status:
+          type: string
+        customerName:
+          type: string
+        customerNotes:
+          type: string
+        address:
+          type: string
+        locationLat:
+          type: number
+        locationLng:
+          type: number
+        total:
+          type: number
+        createdAt:
+          type: string
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/OrderItem"
+      required:
+        - id
+        - status
+        - customerName
+        - address
+        - total
+        - createdAt
+        - items
+
+    UpdateOrderStatusBody:
+      type: object
+      properties:
+        status:
+          type: string
+          enum: [pending, confirmed, shipped, delivered, cancelled]
+      required:
+        - status

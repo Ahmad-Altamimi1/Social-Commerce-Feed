@@ -1,9 +1,77 @@
 import { useEffect, useState } from "react";
 import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerHeader } from "@/components/ui/drawer";
-import { useGetProduct } from "@workspace/api-client-react";
-import { Heart, MessageCircle, Send, Bookmark, ShoppingBag, Store, ChevronRight } from "lucide-react";
+import { useGetProduct, useAddToCart } from "@workspace/api-client-react";
+import { Heart, MessageCircle, Send, Bookmark, ShoppingBag, Store, ChevronRight, ExternalLink } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { useAuth } from "@/lib/auth";
+import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+
+function getSocialEmbedUrl(postUrl: string, platform: string): string | null {
+  try {
+    const url = new URL(postUrl);
+    if (platform === "instagram" || url.hostname.includes("instagram.com")) {
+      const match = url.pathname.match(/\/p\/([A-Za-z0-9_-]+)/);
+      if (match) return `https://www.instagram.com/p/${match[1]}/embed/captioned/`;
+    }
+    if (platform === "tiktok" || url.hostname.includes("tiktok.com")) {
+      const match = url.pathname.match(/\/video\/(\d+)/);
+      if (match) return `https://www.tiktok.com/embed/v2/${match[1]}`;
+    }
+    if (platform === "facebook" || url.hostname.includes("facebook.com")) {
+      return `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(postUrl)}&show_text=true&width=380&appId=`;
+    }
+  } catch {}
+  return null;
+}
+
+function SocialPostEmbed({ postUrl, platform }: { postUrl: string; platform: string }) {
+  const [loaded, setLoaded] = useState(false);
+  const [failed, setFailed] = useState(false);
+  const embedUrl = getSocialEmbedUrl(postUrl, platform);
+
+  if (!embedUrl || failed) {
+    return (
+      <a
+        href={postUrl}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 mx-5 my-3 px-4 py-3 bg-card border border-border rounded-xl text-sm font-medium text-foreground hover:bg-muted transition-colors"
+      >
+        <ExternalLink className="w-4 h-4 text-primary shrink-0" />
+        View original post
+      </a>
+    );
+  }
+
+  const heights: Record<string, number> = {
+    instagram: 560,
+    tiktok: 740,
+    facebook: 320,
+  };
+  const height = heights[platform] ?? 500;
+
+  return (
+    <div className="mx-5 my-3 rounded-2xl overflow-hidden border border-border bg-card relative" style={{ minHeight: loaded ? undefined : height }}>
+      {!loaded && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-primary" />
+        </div>
+      )}
+      <iframe
+        src={embedUrl}
+        className="w-full border-none block"
+        style={{ height, opacity: loaded ? 1 : 0, transition: "opacity 0.3s" }}
+        scrolling="no"
+        allowFullScreen
+        allow="autoplay; clipboard-write; encrypted-media; picture-in-picture"
+        onLoad={() => setLoaded(true)}
+        onError={() => setFailed(true)}
+      />
+    </div>
+  );
+}
 
 interface ProductDetailSheetProps {
   productId: number | null;
@@ -14,19 +82,34 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
   const { data: product, isLoading } = useGetProduct(productId || 0, {
     query: { enabled: !!productId }
   });
+  const { isAuthenticated, login } = useAuth();
+  const { toast } = useToast();
+  const { mutateAsync: addToCart, isPending: addingToCart } = useAddToCart();
+  const queryClient = useQueryClient();
 
-  // Local optimistic state since no mutation endpoints
   const [isLiked, setIsLiked] = useState(false);
   const [isSaved, setIsSaved] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
 
   useEffect(() => {
     if (product) {
-      setIsLiked(product.isLiked);
+      setIsLiked(false);
       setIsSaved(false);
       setActiveImage(0);
     }
   }, [product]);
+
+  const handleAddToCart = async () => {
+    if (!product) return;
+    if (!isAuthenticated) { login(); return; }
+    try {
+      await addToCart({ data: { productId: product.id, quantity: 1 } });
+      await queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
+      toast({ title: "Added to cart!", description: product.title });
+    } catch {
+      toast({ title: "Could not add item", variant: "destructive" });
+    }
+  };
 
   const platform = (product as any)?.platform || "instagram";
   const shares = (product as any)?.shares || Math.floor(Math.random() * 50);
@@ -129,7 +212,7 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
                   className="flex flex-col items-center gap-1 group"
                 >
                   <Heart className={cn("w-6 h-6 transition-transform group-active:scale-75", isLiked ? "fill-destructive text-destructive" : "text-muted-foreground")} />
-                  <span className="text-xs font-semibold text-muted-foreground">{(product.likes + (isLiked ? (product.isLiked ? 0 : 1) : (product.isLiked ? -1 : 0))).toLocaleString()}</span>
+                  <span className="text-xs font-semibold text-muted-foreground">{(product.likes + (isLiked ? 1 : 0)).toLocaleString()}</span>
                 </button>
                 <button className="flex flex-col items-center gap-1 group">
                   <MessageCircle className="w-6 h-6 text-muted-foreground transition-transform group-active:scale-75" />
@@ -148,6 +231,17 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
                 <span className="text-xs font-semibold text-muted-foreground">Save</span>
               </button>
             </div>
+
+            {/* Original Social Post Embed */}
+            {(product as any).postUrl && (
+              <div>
+                <div className="flex items-center gap-2 px-5 pt-4 pb-1">
+                  <div className={cn("w-2 h-2 rounded-full", platformColor)} />
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Original {platformLabel} Post</span>
+                </div>
+                <SocialPostEmbed postUrl={(product as any).postUrl} platform={platform} />
+              </div>
+            )}
 
             {/* Content Info */}
             <div className="px-5 py-4 flex flex-col gap-4">
@@ -190,7 +284,8 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
         {product && (
           <div className="absolute bottom-0 left-0 right-0 p-4 bg-background/90 backdrop-blur-lg border-t border-border z-20">
             <button 
-              disabled={product.isSoldOut}
+              onClick={handleAddToCart}
+              disabled={product.isSoldOut || addingToCart}
               className={cn(
                 "w-full flex items-center justify-center gap-2 py-4 rounded-full font-bold text-base shadow-lg transition-all active:scale-[0.98]",
                 product.isSoldOut 
@@ -199,7 +294,7 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
               )}
             >
               <ShoppingBag className="w-5 h-5" />
-              {product.isSoldOut ? "Out of Stock" : "Add to Cart"}
+              {product.isSoldOut ? "Out of Stock" : addingToCart ? "Adding..." : "Add to Cart"}
             </button>
           </div>
         )}
