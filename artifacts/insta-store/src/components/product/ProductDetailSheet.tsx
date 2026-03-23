@@ -93,8 +93,9 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
   });
   const { mutateAsync: postComment, isPending: commenting } = useAddProductComment();
 
-  const [isLiked, setIsLiked] = useState(false);
-  const [likeCount, setLikeCount] = useState(0);
+  // null = "not overridden" → read from server data; boolean = optimistic override
+  const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
+  const [optimisticCount, setOptimisticCount] = useState<number | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [activeImage, setActiveImage] = useState(0);
   const [showComments, setShowComments] = useState(false);
@@ -103,16 +104,19 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
   const commentsRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  // When product changes (different item opened), reset local overrides
   useEffect(() => {
-    if (product) {
-      setIsLiked((product as any).isLikedByMe ?? false);
-      setLikeCount(product.likes);
-      setIsSaved(false);
-      setActiveImage(0);
-      setShowComments(false);
-      setCommentText("");
-    }
+    setOptimisticLiked(null);
+    setOptimisticCount(null);
+    setIsSaved(false);
+    setActiveImage(0);
+    setShowComments(false);
+    setCommentText("");
   }, [product?.id]);
+
+  // Always derive from server data unless an optimistic override is active
+  const isLiked = optimisticLiked !== null ? optimisticLiked : ((product as any)?.isLikedByMe ?? false);
+  const likeCount = optimisticCount !== null ? optimisticCount : (product?.likes ?? 0);
 
   const handleAddToCart = async () => {
     if (!product) return;
@@ -129,18 +133,25 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
   const handleLike = async () => {
     if (!product) return;
     if (!isAuthenticated) { login(); return; }
-    const prevLiked = isLiked;
-    const prevCount = likeCount;
-    setIsLiked(!prevLiked);
-    setLikeCount(prevLiked ? prevCount - 1 : prevCount + 1);
+    // Optimistic update
+    const nextLiked = !isLiked;
+    const nextCount = nextLiked ? likeCount + 1 : Math.max(0, likeCount - 1);
+    setOptimisticLiked(nextLiked);
+    setOptimisticCount(nextCount);
     try {
       const result = await toggleLike({ id: product.id });
-      setIsLiked(result.liked);
-      setLikeCount(result.likeCount);
-      queryClient.invalidateQueries({ queryKey: getGetProductQueryKey(product.id) });
+      // Confirm from server, then let server data take over
+      setOptimisticLiked(result.liked);
+      setOptimisticCount(result.likeCount);
+      // Invalidate so all queries reflect latest state
+      await queryClient.invalidateQueries({ queryKey: getGetProductQueryKey(product.id) });
+      // Reset optimistic — server data now correct in cache
+      setOptimisticLiked(null);
+      setOptimisticCount(null);
     } catch {
-      setIsLiked(prevLiked);
-      setLikeCount(prevCount);
+      // Rollback
+      setOptimisticLiked(null);
+      setOptimisticCount(null);
     }
   };
 
@@ -160,9 +171,17 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
   const openComments = (focusInput = false) => {
     setShowComments(true);
     setTimeout(() => {
-      commentsRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      // Scroll the drawer's overflow container directly (scrollIntoView doesn't work in Vaul)
+      const container = scrollRef.current;
+      const target = commentsRef.current;
+      if (container && target) {
+        const containerRect = container.getBoundingClientRect();
+        const targetRect = target.getBoundingClientRect();
+        const scrollTop = container.scrollTop + targetRect.top - containerRect.top - 60;
+        container.scrollTo({ top: scrollTop, behavior: "smooth" });
+      }
       if (focusInput && isAuthenticated) commentInputRef.current?.focus();
-    }, 80);
+    }, 120);
   };
 
   const platform = (product as any)?.platform || "instagram";

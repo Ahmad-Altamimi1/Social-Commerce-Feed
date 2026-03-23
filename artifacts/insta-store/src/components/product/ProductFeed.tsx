@@ -1,8 +1,10 @@
 import { useState } from "react";
-import { Product } from "@workspace/api-client-react";
+import { Product, useToggleProductLike } from "@workspace/api-client-react";
 import { Heart, MessageCircle, Send, Bookmark } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatDistanceToNow } from "date-fns";
+import { useAuth } from "@/lib/auth";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface ProductFeedProps {
   products: Product[];
@@ -10,14 +12,37 @@ interface ProductFeedProps {
 }
 
 function FeedItem({ product, onClick }: { product: Product; onClick: () => void }) {
-  const [isLiked, setIsLiked] = useState(product.isLiked);
+  const { isAuthenticated, login } = useAuth();
+  const queryClient = useQueryClient();
+  const { mutateAsync: toggleLike } = useToggleProductLike();
+
+  // Optimistic like state — null means "use server data"
+  const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
+  const [optimisticCount, setOptimisticCount] = useState<number | null>(null);
   const [isSaved, setIsSaved] = useState(false);
   const [showFullDesc, setShowFullDesc] = useState(false);
 
-  // Local like toggle
-  const handleLike = (e: React.MouseEvent) => {
+  const isLiked = optimisticLiked !== null ? optimisticLiked : ((product as any).isLikedByMe ?? false);
+  const likeCount = optimisticCount !== null ? optimisticCount : product.likes;
+
+  const handleLike = async (e: React.MouseEvent) => {
     e.stopPropagation();
-    setIsLiked(!isLiked);
+    if (!isAuthenticated) { login(); return; }
+    const nextLiked = !isLiked;
+    const nextCount = nextLiked ? likeCount + 1 : Math.max(0, likeCount - 1);
+    setOptimisticLiked(nextLiked);
+    setOptimisticCount(nextCount);
+    try {
+      const result = await toggleLike({ id: product.id });
+      setOptimisticLiked(result.liked);
+      setOptimisticCount(result.likeCount);
+      await queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
+      setOptimisticLiked(null);
+      setOptimisticCount(null);
+    } catch {
+      setOptimisticLiked(null);
+      setOptimisticCount(null);
+    }
   };
 
   const isTruncated = product.description.length > 80;
@@ -114,9 +139,9 @@ function FeedItem({ product, onClick }: { product: Product; onClick: () => void 
         <div className="flex items-center justify-between pt-3 border-t border-border">
           <div className="flex items-center gap-5">
             <button onClick={handleLike} className="flex items-center gap-1.5 group">
-              <Heart className={cn("w-5 h-5 transition-colors group-active:scale-75", isLiked ? "fill-destructive text-destructive" : "text-muted-foreground")} />
+              <Heart className={cn("w-5 h-5 transition-colors group-active:scale-75", isLiked ? "fill-red-500 text-red-500" : "text-muted-foreground")} />
               <span className="text-xs font-semibold text-muted-foreground">
-                {(product.likes + (isLiked ? (product.isLiked ? 0 : 1) : (product.isLiked ? -1 : 0))).toLocaleString()}
+                {likeCount.toLocaleString()}
               </span>
             </button>
             <button onClick={onClick} className="flex items-center gap-1.5 group">

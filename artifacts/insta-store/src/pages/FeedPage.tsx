@@ -1,10 +1,12 @@
 import { useState } from "react";
-import { useGetFeed, useAddToCart, useListMerchants, type FeedProduct } from "@workspace/api-client-react";
-import { ShoppingBag, Heart, MessageCircle, Share2, ChevronRight, Search, Bell, LogIn } from "lucide-react";
+import { useGetFeed, useAddToCart, useListMerchants, useToggleProductLike, type FeedProduct } from "@workspace/api-client-react";
+import { ShoppingBag, Heart, MessageCircle, Share2, Search, Bell, LogIn } from "lucide-react";
 import { Link } from "wouter";
 import { MobileContainer } from "@/components/layout/MobileContainer";
+import { ProductDetailSheet } from "@/components/product/ProductDetailSheet";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
 import { cn } from "@/lib/utils";
 
 const PLATFORM_CONFIG: Record<string, { label: string; color: string; bg: string }> = {
@@ -18,10 +20,48 @@ function formatNum(n: number) {
   return String(n);
 }
 
-function FeedCard({ item, onAddToCart }: { item: FeedProduct; onAddToCart: (id: number) => void }) {
-  const [liked, setLiked] = useState(false);
+function FeedCard({
+  item,
+  onAddToCart,
+  onProductClick,
+}: {
+  item: FeedProduct;
+  onAddToCart: (id: number) => void;
+  onProductClick: (id: number) => void;
+}) {
+  const { isAuthenticated, login } = useAuth();
+  const queryClient = useQueryClient();
+  const { mutateAsync: toggleLike } = useToggleProductLike();
+
+  // Optimistic like state — null means "use server data"
+  const [optimisticLiked, setOptimisticLiked] = useState<boolean | null>(null);
+  const [optimisticCount, setOptimisticCount] = useState<number | null>(null);
+
+  const isLiked = optimisticLiked !== null ? optimisticLiked : ((item as any).isLikedByMe ?? false);
+  const likeCount = optimisticCount !== null ? optimisticCount : item.likes;
+
   const platform = PLATFORM_CONFIG[item.platform] ?? PLATFORM_CONFIG.instagram;
   const discount = item.originalPrice ? Math.round((1 - item.price / item.originalPrice) * 100) : null;
+
+  const handleLike = async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!isAuthenticated) { login(); return; }
+    const nextLiked = !isLiked;
+    const nextCount = nextLiked ? likeCount + 1 : Math.max(0, likeCount - 1);
+    setOptimisticLiked(nextLiked);
+    setOptimisticCount(nextCount);
+    try {
+      const result = await toggleLike({ id: item.id });
+      setOptimisticLiked(result.liked);
+      setOptimisticCount(result.likeCount);
+      await queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
+      setOptimisticLiked(null);
+      setOptimisticCount(null);
+    } catch {
+      setOptimisticLiked(null);
+      setOptimisticCount(null);
+    }
+  };
 
   return (
     <div className="bg-card rounded-2xl overflow-hidden shadow-sm border border-border/50 mb-3 mx-3">
@@ -42,8 +82,8 @@ function FeedCard({ item, onAddToCart }: { item: FeedProduct; onAddToCart: (id: 
         </div>
       </Link>
 
-      {/* Product image */}
-      <div className="relative aspect-[4/5] w-full bg-muted">
+      {/* Product image — click to open detail sheet */}
+      <button onClick={() => onProductClick(item.id)} className="relative aspect-[4/5] w-full bg-muted block overflow-hidden active:opacity-95 transition-opacity">
         <img src={item.images[0]} alt={item.title} className="w-full h-full object-cover" />
         {item.badge && (
           <div className="absolute top-2 left-2 bg-primary text-white text-[10px] font-bold px-2 py-0.5 rounded-full shadow-sm">
@@ -55,15 +95,15 @@ function FeedCard({ item, onAddToCart }: { item: FeedProduct; onAddToCart: (id: 
             -{discount}%
           </div>
         )}
-      </div>
+      </button>
 
       {/* Actions row */}
       <div className="flex items-center gap-3 px-3.5 pt-2.5 pb-1">
-        <button onClick={() => setLiked(!liked)} className="flex items-center gap-1 active:scale-90 transition-transform">
-          <Heart className={cn("w-5 h-5", liked ? "fill-red-500 text-red-500" : "text-foreground")} strokeWidth={2} />
-          <span className="text-xs font-medium text-muted-foreground">{formatNum(item.likes + (liked ? 1 : 0))}</span>
+        <button onClick={handleLike} className="flex items-center gap-1 active:scale-90 transition-transform">
+          <Heart className={cn("w-5 h-5 transition-colors", isLiked ? "fill-red-500 text-red-500" : "text-foreground")} strokeWidth={2} />
+          <span className="text-xs font-medium text-muted-foreground">{formatNum(likeCount)}</span>
         </button>
-        <button className="flex items-center gap-1">
+        <button onClick={() => onProductClick(item.id)} className="flex items-center gap-1">
           <MessageCircle className="w-5 h-5 text-foreground" strokeWidth={2} />
           <span className="text-xs font-medium text-muted-foreground">{formatNum(item.comments)}</span>
         </button>
@@ -72,7 +112,7 @@ function FeedCard({ item, onAddToCart }: { item: FeedProduct; onAddToCart: (id: 
         </button>
         <div className="flex-1" />
         <button
-          onClick={() => onAddToCart(item.id)}
+          onClick={(e) => { e.stopPropagation(); onAddToCart(item.id); }}
           disabled={item.isSoldOut}
           className={cn(
             "flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all active:scale-95",
@@ -87,7 +127,7 @@ function FeedCard({ item, onAddToCart }: { item: FeedProduct; onAddToCart: (id: 
       </div>
 
       {/* Product info */}
-      <div className="px-3.5 pb-3 pt-0.5">
+      <button onClick={() => onProductClick(item.id)} className="w-full text-left px-3.5 pb-3 pt-0.5">
         <div className="flex items-baseline gap-2">
           <span className="font-bold text-base text-foreground">${item.price}</span>
           {item.originalPrice && <span className="text-xs text-muted-foreground line-through">${item.originalPrice}</span>}
@@ -101,7 +141,7 @@ function FeedCard({ item, onAddToCart }: { item: FeedProduct; onAddToCart: (id: 
             ))}
           </div>
         )}
-      </div>
+      </button>
     </div>
   );
 }
@@ -110,21 +150,20 @@ type PlatformFilter = "all" | "instagram" | "facebook" | "tiktok";
 
 export default function FeedPage() {
   const [platform, setPlatform] = useState<PlatformFilter>("all");
+  const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
   const { data: feed, isLoading } = useGetFeed({ platform: platform === "all" ? undefined : platform });
   const { data: merchants } = useListMerchants();
   const { isAuthenticated, login } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const { mutateAsync: addToCart } = useAddToCart();
 
   const handleAddToCart = async (productId: number) => {
-    if (!isAuthenticated) {
-      toast({ title: "Sign in to add items to cart", description: "You need an account to shop.", action: undefined });
-      login();
-      return;
-    }
+    if (!isAuthenticated) { login(); return; }
     try {
       await addToCart({ data: { productId, quantity: 1 } });
-      toast({ title: "Added to cart!", description: "Item added successfully." });
+      await queryClient.invalidateQueries({ queryKey: ["/api/cart"] });
+      toast({ title: "Added to cart!" });
     } catch {
       toast({ title: "Could not add item", variant: "destructive" });
     }
@@ -132,6 +171,8 @@ export default function FeedPage() {
 
   return (
     <MobileContainer>
+      <ProductDetailSheet productId={selectedProductId} onClose={() => setSelectedProductId(null)} />
+
       {/* Top Header */}
       <div className="sticky top-0 z-40 bg-background/95 backdrop-blur-md border-b border-border px-4 py-3 flex items-center gap-3">
         <div className="flex-1">
@@ -212,7 +253,12 @@ export default function FeedPage() {
           </div>
         ) : (
           feed?.map((item) => (
-            <FeedCard key={item.id} item={item} onAddToCart={handleAddToCart} />
+            <FeedCard
+              key={item.id}
+              item={item}
+              onAddToCart={handleAddToCart}
+              onProductClick={setSelectedProductId}
+            />
           ))
         )}
       </div>
