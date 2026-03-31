@@ -72,6 +72,7 @@ Seeded merchants: Luxe Boutique (@luxe.boutique), Nomad Gear Co. (@nomad.gear), 
 ## API Routes
 
 ### Public
+
 - `GET /api/feed` — global product feed (all merchants), filterable by platform/category
 - `GET /api/merchants` — list all merchants
 - `GET /api/merchants/:username` — merchant profile
@@ -82,16 +83,19 @@ Seeded merchants: Luxe Boutique (@luxe.boutique), Nomad Gear Co. (@nomad.gear), 
 - `GET /api/login`, `GET /api/callback`, `GET /api/logout` — auth flow
 
 ### Social (likes/comments)
+
 - `POST /api/products/:id/like` — toggle like on a product (authenticated); returns `{ liked, likeCount }`
 - `GET /api/products/:id/comments` — list comments for a product (public)
 - `POST /api/products/:id/comments` — add a comment (authenticated); returns new comment object
 
 ### Authenticated (requires session)
+
 - `GET /api/cart`, `POST /api/cart`, `PUT /api/cart/:itemId`, `DELETE /api/cart/:itemId`, `DELETE /api/cart`
 - `POST /api/orders` — checkout (creates order from cart, clears cart)
 - `GET /api/orders` — user's order history
 
 ### Merchant (requires session + merchant profile)
+
 - `GET /api/merchant/me` — own merchant profile
 - `POST /api/merchant/register` — register as merchant
 - `GET /api/merchant/products` — own products

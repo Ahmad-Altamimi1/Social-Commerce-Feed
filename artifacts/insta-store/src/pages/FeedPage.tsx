@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useGetFeed, useAddToCart, useListMerchants, useToggleProductLike, type FeedProduct } from "@workspace/api-client-react";
+import { useGetFeed, useAddToCart, useListMerchants, useToggleProductLike, type FeedProduct, type Merchant } from "@workspace/api-client-react";
 import { ShoppingBag, Heart, MessageCircle, Share2, Search, Bell, LogIn } from "lucide-react";
 import { Link } from "wouter";
 import { MobileContainer } from "@/components/layout/MobileContainer";
@@ -18,6 +18,15 @@ const PLATFORM_CONFIG: Record<string, { label: string; color: string; bg: string
 function formatNum(n: number) {
   if (n >= 1000) return `${(n / 1000).toFixed(1)}k`;
   return String(n);
+}
+
+function normalizeMerchants(data: unknown): Merchant[] {
+  if (Array.isArray(data)) return data as Merchant[];
+  if (data && typeof data === "object" && "merchants" in data) {
+    const nested = (data as { merchants?: unknown }).merchants;
+    return Array.isArray(nested) ? (nested as Merchant[]) : [];
+  }
+  return [];
 }
 
 function FeedCard({
@@ -157,6 +166,8 @@ export default function FeedPage() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { mutateAsync: addToCart } = useAddToCart();
+  const feedItems = Array.isArray(feed) ? feed : [];
+  const merchantItems = normalizeMerchants(merchants);
 
   const handleAddToCart = async (productId: number) => {
     if (!isAuthenticated) { login(); return; }
@@ -195,10 +206,10 @@ export default function FeedPage() {
       </div>
 
       {/* Merchants Strip */}
-      {merchants && merchants.length > 0 && (
+      {merchantItems.length > 0 && (
         <div className="py-3 border-b border-border/50">
           <div className="flex overflow-x-auto no-scrollbar gap-3 px-4">
-            {merchants.map((m) => (
+            {merchantItems.map((m) => (
               <Link key={m.id} href={`/store/${m.username}`}>
                 <div className="flex flex-col items-center gap-1 shrink-0 active:scale-95 transition-transform">
                   <div className="w-14 h-14 rounded-full ring-2 ring-primary/40 ring-offset-1 overflow-hidden">
@@ -245,14 +256,14 @@ export default function FeedPage() {
               <div key={i} className="rounded-2xl bg-muted animate-pulse h-80" />
             ))}
           </div>
-        ) : feed?.length === 0 ? (
+        ) : feedItems.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-20 text-center px-8">
             <ShoppingBag className="w-12 h-12 text-muted-foreground/40 mb-4" strokeWidth={1} />
             <p className="font-semibold text-foreground mb-1">No products yet</p>
             <p className="text-sm text-muted-foreground">Check back soon for new items!</p>
           </div>
         ) : (
-          feed?.map((item) => (
+          feedItems.map((item) => (
             <FeedCard
               key={item.id}
               item={item}

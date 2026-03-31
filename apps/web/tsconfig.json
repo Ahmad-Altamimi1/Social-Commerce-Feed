@@ -1,0 +1,29 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "include": ["next-env.d.ts", "src/**/*", "app/**/*", ".next/types/**/*.ts"],
+  "exclude": ["node_modules", "build", "dist", "**/*.test.ts"],
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "preserve",
+    "lib": ["esnext", "dom", "dom.iterable"],
+    "resolveJsonModule": true,
+    "allowImportingTsExtensions": true,
+    "moduleResolution": "bundler",
+    "types": ["node"],
+    "plugins": [{ "name": "next" }],
+    "paths": {
+      "@/*": ["./src/*"]
+    }
+  },
+  "references": [
+    {
+      "path": "../../packages/api-client-react"
+    },
+    {
+      "path": "../../packages/api-zod"
+    },
+    {
+      "path": "../../packages/db"
+    }
+  ]
+}

@@ -47,3 +47,19 @@ Thumbs.db
 # Replit
 .cache/
 .local/
+
+# Environment files (never commit secrets)
+.env
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+apps/*/.env
+apps/*/.env.local
+packages/*/.env
+packages/*/.env.local
+!.env.example
+
+# Next.js build output
+.next/
+apps/*/.next/

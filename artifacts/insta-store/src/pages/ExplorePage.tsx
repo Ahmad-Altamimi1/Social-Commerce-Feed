@@ -25,14 +25,19 @@ const PLATFORM_LABELS: Record<string, string> = {
   tiktok: "TT",
 };
 
+function normalizeFeed(data: unknown) {
+  return Array.isArray(data) ? data : [];
+}
+
 export default function ExplorePage() {
   const [search, setSearch] = useState("");
   const [selectedCategory, setSelectedCategory] = useState<string | undefined>();
   const [selectedProductId, setSelectedProductId] = useState<number | null>(null);
 
   const { data: products, isLoading } = useGetFeed({ category: selectedCategory, limit: 60 });
+  const productItems = normalizeFeed(products);
 
-  const filtered = products?.filter((p) =>
+  const filtered = productItems.filter((p) =>
     !search || p.title.toLowerCase().includes(search.toLowerCase()) || p.merchantDisplayName.toLowerCase().includes(search.toLowerCase())
   );
 
@@ -95,7 +100,7 @@ export default function ExplorePage() {
               <div key={i} className="aspect-square bg-muted" />
             ))}
           </div>
-        ) : !filtered?.length ? (
+        ) : !filtered.length ? (
           <div className="flex flex-col items-center justify-center py-24 text-center px-8">
             <p className="text-2xl mb-2">🔍</p>
             <p className="font-semibold text-foreground">No results</p>
@@ -150,7 +155,7 @@ export default function ExplorePage() {
       </div>
 
       {/* Result count */}
-      {!isLoading && filtered && filtered.length > 0 && (
+      {!isLoading && filtered.length > 0 && (
         <div className="text-center py-4 text-xs text-muted-foreground">
           {filtered.length} product{filtered.length !== 1 ? "s" : ""}
           {selectedCategory ? ` in ${CATEGORIES.find((c) => c.slug === selectedCategory)?.label}` : ""}
