@@ -7,6 +7,7 @@ const basePath =
 const nextConfig: NextConfig = {
   basePath,
   typedRoutes: false,
+  useFileSystemPublicRoutes: false,
   transpilePackages: [
     "@workspace/api-client-react",
     "@workspace/api-zod",
