@@ -21,11 +21,6 @@ import { cn } from "@/lib/utils";
 type Tab = "overview" | "orders" | "products";
 
 const CATEGORIES = ["clothing", "beauty", "accessories", "home", "outdoors", "electronics", "food", "sports", "other"];
-const PLATFORMS = [
-  { value: "instagram", label: "Instagram" },
-  { value: "facebook", label: "Facebook" },
-  { value: "tiktok", label: "TikTok" },
-];
 const BADGES = ["", "New", "Sale", "Hot", "Limited", "Best Seller"];
 
 const STATUS_CONFIG: Record<string, { label: string; color: string; icon: React.ElementType }> = {
@@ -42,7 +37,6 @@ type ProductFormData = {
   price: string;
   originalPrice: string;
   category: string;
-  platform: string;
   tags: string;
   images: string;
   badge: string;
@@ -56,7 +50,6 @@ const EMPTY_FORM: ProductFormData = {
   price: "",
   originalPrice: "",
   category: "clothing",
-  platform: "instagram",
   tags: "",
   images: "",
   badge: "",
@@ -99,12 +92,7 @@ function ProductSheet({
     if (wizardMode === "social") {
       if (!form.postUrl.trim()) { toast({ title: "Please enter a social post URL", variant: "destructive" }); return; }
       try {
-        const parsedPost = new URL(form.postUrl.trim());
-        const validHosts = ["instagram.com", "www.instagram.com", "tiktok.com", "www.tiktok.com", "vm.tiktok.com"];
-        if (!validHosts.includes(parsedPost.hostname)) {
-          toast({ title: "Invalid post URL", description: "Only Instagram and TikTok post URLs are supported.", variant: "destructive" });
-          return;
-        }
+        new URL(form.postUrl.trim());
       } catch {
         toast({ title: "Invalid post URL", description: "Please enter a valid URL.", variant: "destructive" });
         return;
@@ -119,7 +107,7 @@ function ProductSheet({
       price: parseFloat(form.price),
       originalPrice: form.originalPrice ? parseFloat(form.originalPrice) : undefined,
       category: form.category,
-      platform: form.platform,
+      platform: "store",
       tags,
       images,
       badge: form.badge || undefined,
@@ -151,7 +139,7 @@ function ProductSheet({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col justify-end" style={{ maxWidth: 428, margin: "0 auto" }}>
+    <div className="fixed inset-0 z-[70] flex flex-col justify-end" style={{ maxWidth: 428, margin: "0 auto" }}>
       <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={handleClose} />
       <div className="relative bg-background rounded-t-3xl max-h-[92dvh] flex flex-col shadow-2xl">
         {/* Handle */}
@@ -196,7 +184,7 @@ function ProductSheet({
               </div>
             </button>
             <button
-              onClick={() => { setForm({ ...EMPTY_FORM, platform: "instagram" }); setWizardMode("social"); }}
+              onClick={() => { setForm({ ...EMPTY_FORM }); setWizardMode("social"); }}
               className="flex items-start gap-4 p-5 bg-card border-2 border-border rounded-2xl hover:border-primary/40 hover:bg-primary/5 active:scale-[0.98] transition-all text-left"
             >
               <div className="w-11 h-11 rounded-xl bg-primary/10 flex items-center justify-center shrink-0 mt-0.5">
@@ -204,7 +192,7 @@ function ProductSheet({
               </div>
               <div>
                 <p className="font-bold text-base">Link a social post</p>
-                <p className="text-sm text-muted-foreground mt-0.5">Paste an Instagram or TikTok post URL. The post will be embedded in your product — no image required.</p>
+                <p className="text-sm text-muted-foreground mt-0.5">Paste a social post URL. The post will be embedded in your product — no image required.</p>
               </div>
             </button>
           </div>
@@ -219,26 +207,12 @@ function ProductSheet({
                 <div className="bg-primary/5 border border-primary/20 rounded-2xl p-4 space-y-4">
                   <p className="text-xs font-bold uppercase tracking-wide text-primary">Social Post Details</p>
                   <div>
-                    <label className="field-label text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5 block">Platform</label>
-                    <select
-                      value={form.platform}
-                      onChange={(e) => set("platform", e.target.value)}
-                      className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-                    >
-                      {PLATFORMS.filter((p) => p.value !== "facebook").map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                    </select>
-                  </div>
-                  <div>
                     <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
                       <Link2 className="w-3 h-3" /> Post URL <span className="text-primary">*</span>
                     </label>
                     <input
                       type="url"
-                      placeholder={
-                        form.platform === "instagram"
-                          ? "https://www.instagram.com/p/ABC123/"
-                          : "https://www.tiktok.com/@user/video/1234567890"
-                      }
+                      placeholder="https://www.instagram.com/p/ABC123/"
                       value={form.postUrl}
                       onChange={(e) => set("postUrl", e.target.value)}
                       className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
@@ -312,8 +286,8 @@ function ProductSheet({
                 </div>
               </div>
 
-              {/* Category + Platform (scratch mode shows platform selector here) */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Category */}
+              <div>
                 <div>
                   <label className="field-label text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5 block">Category</label>
                   <select
@@ -324,18 +298,6 @@ function ProductSheet({
                     {CATEGORIES.map((c) => <option key={c} value={c} className="capitalize">{c.charAt(0).toUpperCase() + c.slice(1)}</option>)}
                   </select>
                 </div>
-                {wizardMode === "scratch" && (
-                  <div>
-                    <label className="field-label text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5 block">Platform</label>
-                    <select
-                      value={form.platform}
-                      onChange={(e) => set("platform", e.target.value)}
-                      className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
-                    >
-                      {PLATFORMS.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-                    </select>
-                  </div>
-                )}
               </div>
 
               {/* Badge + Featured */}
@@ -404,7 +366,7 @@ function ProductSheet({
                 )}
                 {wizardMode === "social" && !form.images.trim() && hasPostUrl && (
                   <p className="text-[11px] text-muted-foreground mt-1.5 flex items-center gap-1">
-                    <span className="text-blue-500">ℹ</span> The embedded social post will serve as the product visual
+                    <span className="text-blue-500">ℹ</span> The embedded post will serve as the product visual
                   </p>
                 )}
               </div>
@@ -412,19 +374,13 @@ function ProductSheet({
               {/* Social Post URL (scratch mode) */}
               {wizardMode === "scratch" && (
                 <div>
-                  <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
-                    <Link2 className="w-3 h-3" /> Social Post URL
+                    <label className="field-label flex items-center gap-1.5 text-xs font-bold uppercase tracking-wide text-muted-foreground mb-1.5">
+                    <Link2 className="w-3 h-3" /> External Post URL
                     <span className="text-muted-foreground/60 font-normal normal-case tracking-normal">(optional — embeds original post)</span>
                   </label>
                   <input
                     type="url"
-                    placeholder={
-                      form.platform === "instagram"
-                        ? "https://www.instagram.com/p/ABC123/"
-                        : form.platform === "tiktok"
-                        ? "https://www.tiktok.com/@user/video/1234567890"
-                        : "https://www.facebook.com/your_page/posts/123456"
-                    }
+                    placeholder="https://www.instagram.com/p/ABC123/"
                     value={form.postUrl}
                     onChange={(e) => set("postUrl", e.target.value)}
                     className="w-full bg-card border border-border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary transition-all"
@@ -442,7 +398,7 @@ function ProductSheet({
             </div>
 
             {/* Submit button */}
-            <div className="shrink-0 px-5 pb-[calc(env(safe-area-inset-bottom)+16px)] pt-3 border-t border-border bg-background">
+            <div className="shrink-0 px-5 pb-[calc(env(safe-area-inset-bottom)+92px)] pt-3 border-t border-border bg-background">
               <button
                 onClick={handleSubmit}
                 disabled={isPending}
@@ -606,7 +562,6 @@ export default function DashboardPage() {
         price: String(p.price),
         originalPrice: p.originalPrice ? String(p.originalPrice) : "",
         category: p.category,
-        platform: p.platform,
         tags: p.tags.join(", "),
         images: p.images.join("\n"),
         badge: p.badge ?? "",
@@ -699,22 +654,6 @@ export default function DashboardPage() {
               ))}
             </div>
 
-            {merchant.socialLinks.length > 0 && (
-              <div className="bg-card rounded-2xl border border-border/50 p-4">
-                <h3 className="font-semibold text-sm mb-3">Connected Platforms</h3>
-                <div className="space-y-2">
-                  {merchant.socialLinks.map((sl) => (
-                    <div key={sl.platform} className="flex items-center justify-between">
-                      <span className="text-sm capitalize">{sl.platform}</span>
-                      <span className="text-xs font-medium text-muted-foreground">
-                        {sl.followerCount ? `${(sl.followerCount / 1000).toFixed(1)}k` : sl.handle}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
             {/* Quick action to add product from overview */}
             <button
               onClick={() => { setTab("products"); setShowCreateSheet(true); }}
@@ -799,7 +738,7 @@ export default function DashboardPage() {
                   <img src={p.images[0]} alt={p.title} className="w-16 h-16 rounded-xl object-cover bg-muted shrink-0" />
                   <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm line-clamp-1">{p.title}</p>
-                    <p className="text-xs text-muted-foreground capitalize">{p.platform} · {p.category}</p>
+                    <p className="text-xs text-muted-foreground capitalize">{p.category}</p>
                     <div className="flex items-center gap-2 mt-0.5">
                       <p className="font-bold text-primary text-sm">${p.price}</p>
                       {p.originalPrice && <p className="text-xs text-muted-foreground line-through">${p.originalPrice}</p>}

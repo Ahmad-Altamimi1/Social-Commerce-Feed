@@ -30,9 +30,9 @@ export function ProfileHeader() {
   const tagline = (store as any).tagline || store.category || "Premium Quality Goods";
 
   const socialLinks = (store as any).socialLinks || [
-    { platform: "instagram", handle: "@" + store.username, followerCount: 15000 },
-    { platform: "facebook", handle: store.displayName, followerCount: 8000 },
-    { platform: "tiktok", handle: "@" + store.username, followerCount: 1500 }
+    { handle: "@" + store.username, followerCount: 15000 },
+    { handle: store.displayName, followerCount: 8000 },
+    { handle: "@" + store.username, followerCount: 1500 }
   ];
 
   return (
@@ -98,26 +98,8 @@ export function ProfileHeader() {
         {/* Platform Links */}
         <div className="flex gap-2 mb-4 overflow-x-auto no-scrollbar pb-1">
           {socialLinks.map((link: any, idx: number) => {
-            let bgColor = "bg-zinc-800";
-            let textColor = "text-white";
-            let label = "TK";
-            
-            if (link.platform === "instagram") {
-              bgColor = "bg-[#E1306C]";
-              label = "IG";
-            } else if (link.platform === "facebook") {
-              bgColor = "bg-[#1877F2]";
-              label = "FB";
-            } else if (link.platform === "tiktok") {
-              bgColor = "bg-[#000000]";
-              label = "TT";
-            }
-
             return (
               <div key={idx} className="flex items-center gap-2 bg-secondary/60 pl-1 pr-3 py-1 rounded-full shrink-0 border border-border">
-                <div className={`w-6 h-6 rounded-full flex items-center justify-center ${bgColor} ${textColor} text-[10px] font-bold`}>
-                  {label}
-                </div>
                 <div className="flex flex-col">
                   <span className="text-xs font-semibold leading-none">{link.handle}</span>
                   <span className="text-[10px] text-muted-foreground leading-none mt-0.5">

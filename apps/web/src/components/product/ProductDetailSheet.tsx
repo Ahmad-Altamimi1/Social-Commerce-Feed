@@ -5,7 +5,6 @@ import { Drawer, DrawerContent, DrawerTitle, DrawerDescription, DrawerHeader } f
 import {
   useGetProduct, useAddToCart, useToggleProductLike,
   useListProductComments, useAddProductComment, useShareProduct,
-  getGetProductQueryKey,
 } from "@workspace/api-client-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Heart, MessageCircle, Send, Bookmark, ShoppingBag, Store, ChevronRight, ExternalLink, Loader2 } from "lucide-react";
@@ -14,24 +13,19 @@ import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { ImageSlider } from "@/components/product/ImageSlider";
+import {
+  patchLikeInCaches,
+  restoreLikeCacheSnapshot,
+  takeLikeCacheSnapshot,
+} from "@/lib/like-cache";
 
-function isSupportedOembedPlatform(platform: string): boolean {
-  return platform === "instagram" || platform === "tiktok";
-}
-
-function SocialPostEmbed({ postUrl, platform }: { postUrl: string; platform: string }) {
+function SocialPostEmbed({ postUrl }: { postUrl: string }) {
   const [embedHtml, setEmbedHtml] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [failed, setFailed] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    if (!isSupportedOembedPlatform(platform)) {
-      setLoading(false);
-      setFailed(true);
-      return;
-    }
-
     let cancelled = false;
     setLoading(true);
     setFailed(false);
@@ -56,7 +50,7 @@ function SocialPostEmbed({ postUrl, platform }: { postUrl: string; platform: str
       });
 
     return () => { cancelled = true; };
-  }, [postUrl, platform]);
+  }, [postUrl]);
 
   useEffect(() => {
     if (!embedHtml || !containerRef.current) return;
@@ -167,20 +161,19 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
     // Optimistic update
     const nextLiked = !isLiked;
     const nextCount = nextLiked ? likeCount + 1 : Math.max(0, likeCount - 1);
+    const snapshot = takeLikeCacheSnapshot(queryClient);
     setOptimisticLiked(nextLiked);
     setOptimisticCount(nextCount);
+    patchLikeInCaches(queryClient, product.id, nextLiked, nextCount);
     try {
       const result = await toggleLike({ id: product.id });
-      // Confirm from server, then let server data take over
       setOptimisticLiked(result.liked);
       setOptimisticCount(result.likeCount);
-      // Invalidate so all queries reflect latest state
-      await queryClient.invalidateQueries({ queryKey: getGetProductQueryKey(product.id) });
-      // Reset optimistic — server data now correct in cache
+      patchLikeInCaches(queryClient, product.id, result.liked, result.likeCount);
       setOptimisticLiked(null);
       setOptimisticCount(null);
     } catch {
-      // Rollback
+      restoreLikeCacheSnapshot(queryClient, snapshot);
       setOptimisticLiked(null);
       setOptimisticCount(null);
     }
@@ -243,13 +236,6 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
     }, 120);
   };
 
-  const platform = (product as any)?.platform || "instagram";
-
-  let platformColor = "bg-zinc-800";
-  let platformLabel = "TikTok";
-  if (platform === "instagram") { platformColor = "bg-[#E1306C]"; platformLabel = "Instagram"; }
-  else if (platform === "facebook") { platformColor = "bg-[#1877F2]"; platformLabel = "Facebook"; }
-
   return (
     <Drawer open={!!productId} onOpenChange={(open) => !open && onClose()}>
       <DrawerContent className="max-h-[90vh] flex flex-col rounded-t-[1.5rem] bg-background max-w-[428px] mx-auto border-x">
@@ -270,10 +256,6 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
                 <img src={product.sellerAvatar} alt={product.sellerUsername} className="w-10 h-10 rounded-full object-cover border border-border" />
                 <div className="flex flex-col">
                   <span className="font-bold text-sm leading-tight">{product.sellerUsername}</span>
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <div className={`w-2 h-2 rounded-full ${platformColor}`} />
-                    <span className="text-xs text-muted-foreground font-medium">via {platformLabel}</span>
-                  </div>
                 </div>
               </div>
               <button className="text-primary font-semibold text-sm px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors">
@@ -334,10 +316,9 @@ export function ProductDetailSheet({ productId, onClose }: ProductDetailSheetPro
             {(product as any).postUrl && (
               <div>
                 <div className="flex items-center gap-2 px-5 pt-4 pb-1">
-                  <div className={cn("w-2 h-2 rounded-full", platformColor)} />
-                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Original {platformLabel} Post</span>
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Original Post</span>
                 </div>
-                <SocialPostEmbed postUrl={(product as any).postUrl} platform={platform} />
+                <SocialPostEmbed postUrl={(product as any).postUrl} />
               </div>
             )}
 

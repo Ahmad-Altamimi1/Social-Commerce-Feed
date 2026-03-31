@@ -10,6 +10,11 @@ import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
 import { ImageSlider } from "@/components/product/ImageSlider";
+import {
+  patchLikeInCaches,
+  restoreLikeCacheSnapshot,
+  takeLikeCacheSnapshot,
+} from "@/lib/like-cache";
 
 interface ProductFeedProps {
   products: Product[];
@@ -39,16 +44,19 @@ function FeedItem({ product, onClick }: { product: Product; onClick: () => void 
     if (!isAuthenticated) { login(); return; }
     const nextLiked = !isLiked;
     const nextCount = nextLiked ? likeCount + 1 : Math.max(0, likeCount - 1);
+    const snapshot = takeLikeCacheSnapshot(queryClient);
     setOptimisticLiked(nextLiked);
     setOptimisticCount(nextCount);
+    patchLikeInCaches(queryClient, product.id, nextLiked, nextCount);
     try {
       const result = await toggleLike({ id: product.id });
       setOptimisticLiked(result.liked);
       setOptimisticCount(result.likeCount);
-      await queryClient.invalidateQueries({ queryKey: ["/api/feed"] });
+      patchLikeInCaches(queryClient, product.id, result.liked, result.likeCount);
       setOptimisticLiked(null);
       setOptimisticCount(null);
     } catch {
+      restoreLikeCacheSnapshot(queryClient, snapshot);
       setOptimisticLiked(null);
       setOptimisticCount(null);
     }
@@ -85,20 +93,6 @@ function FeedItem({ product, onClick }: { product: Product; onClick: () => void 
   const isTruncated = product.description.length > 80;
   const descToShow = showFullDesc ? product.description : `${product.description.slice(0, 80)}${isTruncated ? "..." : ""}`;
 
-  const platform = (product as any).platform || "instagram";
-  let platformColor = "bg-zinc-800 text-white";
-  let platformLabel = "TK";
-  if (platform === "instagram") {
-    platformColor = "bg-[#E1306C] text-white";
-    platformLabel = "IG";
-  } else if (platform === "facebook") {
-    platformColor = "bg-[#1877F2] text-white";
-    platformLabel = "FB";
-  } else if (platform === "tiktok") {
-    platformColor = "bg-[#000000] text-white";
-    platformLabel = "TT";
-  }
-
   const slug = (product as any).slug || product.id.toString();
 
   return (
@@ -106,13 +100,6 @@ function FeedItem({ product, onClick }: { product: Product; onClick: () => void 
       {/* Image Slider */}
       <div className="relative cursor-pointer" onClick={onClick}>
         <ImageSlider images={product.images} alt={product.title} aspectClass="aspect-[4/5]" />
-
-        {/* Top Badges */}
-        <div className="absolute top-3 right-3 flex flex-col gap-2 items-end z-10">
-          <div className={cn("text-[10px] font-bold px-2 py-1 rounded-full shadow-md backdrop-blur-sm", platformColor)}>
-            {platformLabel}
-          </div>
-        </div>
 
         <div className="absolute top-3 left-3 flex flex-col gap-2 items-start z-10">
           {product.isSoldOut ? (

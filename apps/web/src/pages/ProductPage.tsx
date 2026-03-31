@@ -16,29 +16,34 @@ import { formatDistanceToNow } from "date-fns";
 import { useAuth } from "@/lib/auth";
 import { useToast } from "@/hooks/use-toast";
 import { ImageSlider } from "@/components/product/ImageSlider";
+import {
+  patchLikeInCaches,
+  restoreLikeCacheSnapshot,
+  takeLikeCacheSnapshot,
+} from "@/lib/like-cache";
 
-function getSocialEmbedUrl(postUrl: string, platform: string): string | null {
+function getSocialEmbedUrl(postUrl: string): string | null {
   try {
     const url = new URL(postUrl);
-    if (platform === "instagram" || url.hostname.includes("instagram.com")) {
+    if (url.hostname.includes("instagram.com")) {
       const match = url.pathname.match(/\/p\/([A-Za-z0-9_-]+)/);
       if (match) return `https://www.instagram.com/p/${match[1]}/embed/captioned/`;
     }
-    if (platform === "tiktok" || url.hostname.includes("tiktok.com")) {
+    if (url.hostname.includes("tiktok.com")) {
       const match = url.pathname.match(/\/video\/(\d+)/);
       if (match) return `https://www.tiktok.com/embed/v2/${match[1]}`;
     }
-    if (platform === "facebook" || url.hostname.includes("facebook.com")) {
+    if (url.hostname.includes("facebook.com")) {
       return `https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(postUrl)}&show_text=true&width=380&appId=`;
     }
   } catch {}
   return null;
 }
 
-function SocialPostEmbed({ postUrl, platform }: { postUrl: string; platform: string }) {
+function SocialPostEmbed({ postUrl }: { postUrl: string }) {
   const [loaded, setLoaded] = useState(false);
   const [failed, setFailed] = useState(false);
-  const embedUrl = getSocialEmbedUrl(postUrl, platform);
+  const embedUrl = getSocialEmbedUrl(postUrl);
 
   if (!embedUrl || failed) {
     return (
@@ -54,8 +59,11 @@ function SocialPostEmbed({ postUrl, platform }: { postUrl: string; platform: str
     );
   }
 
-  const heights: Record<string, number> = { instagram: 560, tiktok: 740, facebook: 320 };
-  const height = heights[platform] ?? 500;
+  const height = embedUrl.includes("instagram.com")
+    ? 560
+    : embedUrl.includes("tiktok.com")
+      ? 740
+      : 500;
 
   return (
     <div className="mx-5 my-3 rounded-2xl overflow-hidden border border-border bg-card relative" style={{ minHeight: loaded ? undefined : height }}>
@@ -128,13 +136,19 @@ export default function ProductPage({ slug }: { slug: string }) {
     if (!isAuthenticated) { login(); return; }
     const prevLiked = isLiked;
     const prevCount = likeCount;
-    setIsLiked(!prevLiked);
-    setLikeCount(prevLiked ? prevCount - 1 : prevCount + 1);
+    const nextLiked = !prevLiked;
+    const nextCount = nextLiked ? prevCount + 1 : Math.max(0, prevCount - 1);
+    const snapshot = takeLikeCacheSnapshot(queryClient);
+    setIsLiked(nextLiked);
+    setLikeCount(nextCount);
+    patchLikeInCaches(queryClient, product.id, nextLiked, nextCount);
     try {
       const result = await toggleLike({ id: product.id });
       setIsLiked(result.liked);
       setLikeCount(result.likeCount);
+      patchLikeInCaches(queryClient, product.id, result.liked, result.likeCount);
     } catch {
+      restoreLikeCacheSnapshot(queryClient, snapshot);
       setIsLiked(prevLiked);
       setLikeCount(prevCount);
     }
@@ -186,12 +200,6 @@ export default function ProductPage({ slug }: { slug: string }) {
     setShowComments(true);
     setTimeout(() => commentInputRef.current?.focus(), 100);
   };
-
-  const platform = (product as any)?.platform || "instagram";
-  let platformColor = "bg-zinc-800";
-  let platformLabel = "TikTok";
-  if (platform === "instagram") { platformColor = "bg-[#E1306C]"; platformLabel = "Instagram"; }
-  else if (platform === "facebook") { platformColor = "bg-[#1877F2]"; platformLabel = "Facebook"; }
 
   if (isLoading) {
     return (
@@ -246,10 +254,6 @@ export default function ProductPage({ slug }: { slug: string }) {
             <img src={product.sellerAvatar} alt={product.sellerUsername} className="w-10 h-10 rounded-full object-cover border border-border" />
             <div className="flex flex-col">
               <span className="font-bold text-sm leading-tight">{product.sellerUsername}</span>
-              <div className="flex items-center gap-1.5 mt-0.5">
-                <div className={`w-2 h-2 rounded-full ${platformColor}`} />
-                <span className="text-xs text-muted-foreground font-medium">via {platformLabel}</span>
-              </div>
             </div>
           </div>
           <button className="text-primary font-semibold text-sm px-3 py-1.5 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors">
@@ -308,10 +312,9 @@ export default function ProductPage({ slug }: { slug: string }) {
         {(product as any).postUrl && (
           <div>
             <div className="flex items-center gap-2 px-5 pt-4 pb-1">
-              <div className={cn("w-2 h-2 rounded-full", platformColor)} />
-              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Original {platformLabel} Post</span>
+              <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Original Post</span>
             </div>
-            <SocialPostEmbed postUrl={(product as any).postUrl} platform={platform} />
+            <SocialPostEmbed postUrl={(product as any).postUrl} />
           </div>
         )}
 

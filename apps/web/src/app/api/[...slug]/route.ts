@@ -61,14 +61,12 @@ async function handle(req: NextRequest, slug: string[] = []) {
   if ((path === "/login" || path === "/callback" || path === "/logout") && method === "GET") return j({ error: "Deprecated. Use Clerk client-side auth flow." }, 410);
 
   if (path === "/feed" && method === "GET") {
-    const platform = url.searchParams.get("platform");
     const category = url.searchParams.get("category");
     const limit = Math.min(int(url.searchParams.get("limit"), 20), 100);
     const offset = int(url.searchParams.get("offset"), 0);
     let products = await db.select().from(productsTable);
     const merchants = await db.select().from(merchantsTable);
     const mMap = new Map(merchants.map((m) => [m.id, m]));
-    if (platform) products = products.filter((p) => p.platform === platform);
     if (category && category !== "all") products = products.filter((p) => p.category === category);
     products = products.sort((a, b) => b.postedAt.getTime() - a.postedAt.getTime()).slice(offset, offset + limit);
     let liked = new Set<number>();
@@ -90,8 +88,6 @@ async function handle(req: NextRequest, slug: string[] = []) {
     if (!section) return j(fmtMerchant(rows[0]));
     if (section === "products") {
       let products = await db.select().from(productsTable).where(eq(productsTable.merchantId, rows[0].id));
-      const platform = url.searchParams.get("platform");
-      if (platform) products = products.filter((p) => p.platform === platform);
       return j(products.map((p) => fmtProduct(p)));
     }
     if (section === "highlights") {
@@ -140,7 +136,8 @@ async function handle(req: NextRequest, slug: string[] = []) {
     const m = await db.select().from(merchantsTable).where(eq(merchantsTable.userId, user.id));
     if (!m[0]) return j({ error: "No merchant profile" }, 403);
     const body = await req.json();
-    const [p] = await db.insert(productsTable).values({ ...body, merchantId: m[0].id, sellerUsername: m[0].username, sellerAvatar: m[0].avatar }).returning();
+    const { platform: _ignoredPlatform, ...productData } = body ?? {};
+    const [p] = await db.insert(productsTable).values({ ...productData, platform: "store", merchantId: m[0].id, sellerUsername: m[0].username, sellerAvatar: m[0].avatar }).returning();
     return j(fmtProduct(p), 201);
   }
   if (path.startsWith("/merchant/products/")) {
@@ -148,7 +145,9 @@ async function handle(req: NextRequest, slug: string[] = []) {
     const id = int(path.split("/")[3], NaN);
     if (Number.isNaN(id)) return j({ error: "Invalid id" }, 400);
     if (method === "PUT") {
-      const [p] = await db.update(productsTable).set(await req.json()).where(eq(productsTable.id, id)).returning();
+      const body = await req.json();
+      const { platform: _ignoredPlatform, ...productData } = body ?? {};
+      const [p] = await db.update(productsTable).set(productData).where(eq(productsTable.id, id)).returning();
       return j(fmtProduct(p));
     }
     if (method === "DELETE") {
@@ -234,10 +233,8 @@ async function handle(req: NextRequest, slug: string[] = []) {
     let rows = await db.select().from(productsTable);
     const category = url.searchParams.get("category");
     const featured = url.searchParams.get("featured");
-    const platform = url.searchParams.get("platform");
     if (category && category !== "all") rows = rows.filter((r) => r.category === category);
     if (featured === "true") rows = rows.filter((r) => r.isFeatured);
-    if (platform) rows = rows.filter((r) => r.platform === platform);
     return j(rows.map((r) => fmtProduct(r)));
   }
   if (path.startsWith("/products/by-slug/") && method === "GET") {
@@ -300,7 +297,7 @@ async function handle(req: NextRequest, slug: string[] = []) {
       if (parsed.protocol !== "https:") return j({ error: "Only HTTPS URLs are supported" }, 400);
       const isInsta = ["instagram.com", "www.instagram.com"].includes(parsed.hostname);
       const isTikTok = ["tiktok.com", "www.tiktok.com", "vm.tiktok.com"].includes(parsed.hostname);
-      if (!isInsta && !isTikTok) return j({ error: "Unsupported platform. Only Instagram and TikTok are supported." }, 400);
+      if (!isInsta && !isTikTok) return j({ error: "Unsupported URL. Only supported oEmbed providers are allowed." }, 400);
       const upstreamUrl = isInsta ? `https://api.instagram.com/oembed/?url=${encodeURIComponent(sourceUrl)}&omitscript=false` : `https://www.tiktok.com/oembed?url=${encodeURIComponent(sourceUrl)}`;
       const upstream = await fetch(upstreamUrl, { headers: { "User-Agent": "Mozilla/5.0 (compatible; SocialShopBot/1.0)" } });
       if (!upstream.ok) return j({ error: `Upstream oEmbed request failed with status ${upstream.status}` }, 502);

@@ -1,6 +1,5 @@
 import { Product } from "@workspace/api-client-react";
 import { Grid3X3, Square } from "lucide-react";
-import { cn } from "@/lib/utils";
 
 interface ProductGridProps {
   products: Product[];
@@ -21,22 +20,6 @@ export function ProductGrid({ products, onProductClick }: ProductGridProps) {
   return (
     <div className="grid grid-cols-2 gap-2 p-2 bg-background pb-20">
       {products.map((product) => {
-        // Mock platform badge data
-        const platform = (product as any).platform || ["instagram", "facebook", "tiktok"][Math.floor(Math.random() * 3)];
-        
-        let platformColor = "bg-zinc-800 text-white";
-        let platformLabel = "TK";
-        if (platform === "instagram") {
-          platformColor = "bg-[#E1306C] text-white";
-          platformLabel = "IG";
-        } else if (platform === "facebook") {
-          platformColor = "bg-[#1877F2] text-white";
-          platformLabel = "FB";
-        } else if (platform === "tiktok") {
-          platformColor = "bg-[#000000] text-white";
-          platformLabel = "TT";
-        }
-
         return (
           <button
             key={product.id}
@@ -60,9 +43,6 @@ export function ProductGrid({ products, onProductClick }: ProductGridProps) {
                 )}
               </div>
               <div className="flex flex-col gap-1 items-end">
-                <div className={cn("text-[9px] font-bold px-1.5 py-0.5 rounded-full shadow-sm backdrop-blur-md", platformColor)}>
-                  {platformLabel}
-                </div>
                 {product.images.length > 1 && (
                   <div className="bg-black/50 rounded-md p-1 backdrop-blur-sm">
                     <Square className="w-3 h-3 text-white fill-white/20" strokeWidth={2.5} />

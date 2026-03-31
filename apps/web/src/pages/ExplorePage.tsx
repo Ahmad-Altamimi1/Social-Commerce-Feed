@@ -15,18 +15,6 @@ const CATEGORIES = [
   { slug: "outdoors", label: "Outdoors", emoji: "🏕️" },
 ];
 
-const PLATFORM_COLORS: Record<string, string> = {
-  instagram: "#E1306C",
-  facebook: "#1877F2",
-  tiktok: "#000000",
-};
-
-const PLATFORM_LABELS: Record<string, string> = {
-  instagram: "IG",
-  facebook: "FB",
-  tiktok: "TT",
-};
-
 function normalizeFeed(data: unknown) {
   return Array.isArray(data) ? data : [];
 }
@@ -113,8 +101,6 @@ export default function ExplorePage() {
         ) : (
           <div className="grid grid-cols-3 gap-0.5 mt-0.5">
             {filtered.map((product) => {
-              const platformColor = PLATFORM_COLORS[product.platform] ?? "#999";
-              const platformLabel = PLATFORM_LABELS[product.platform] ?? "?";
               return (
                 <button
                   key={product.id}
@@ -129,14 +115,6 @@ export default function ExplorePage() {
                   />
                   {/* Overlay on hover */}
                   <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent opacity-0 group-active:opacity-100 transition-opacity" />
-
-                  {/* Platform badge */}
-                  <span
-                    className="absolute top-1.5 right-1.5 text-[9px] font-black text-white rounded px-1 py-0.5 leading-none"
-                    style={{ backgroundColor: platformColor }}
-                  >
-                    {platformLabel}
-                  </span>
 
                   {/* Price on active */}
                   <div className="absolute bottom-0 left-0 right-0 p-2 opacity-0 group-active:opacity-100 transition-opacity">
